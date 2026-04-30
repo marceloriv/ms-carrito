@@ -11,8 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Pedido - Entidad principal del dominio (reemplaza CarritoDeCompras).
- * Aligned with ERS RF-3, RF-6.
+ * Pedido - Entidad principal del dominio (reemplaza `CarritoDeCompras`).
  */
 @Entity
 @Table(name = "PEDIDO")
@@ -31,7 +30,7 @@ public class Pedido {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "ESTADO_PEDIDO", length = 20, nullable = false)
-    private EstadoPedido estadoPedido = EstadoPedido.CREATED;
+    private EstadoPedido estadoPedido = EstadoPedido.CREADO;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "ESTADO_PAGO", length = 20, nullable = false)
@@ -76,7 +75,7 @@ public class Pedido {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
         if (estadoPedido == null) {
-            estadoPedido = EstadoPedido.CREATED;
+            estadoPedido = EstadoPedido.CREADO;
         }
         if (estadoPago == null) {
             estadoPago = EstadoPago.PENDIENTE;
@@ -89,7 +88,7 @@ public class Pedido {
     }
 
     /**
-     * Business method: Recalculate totals based on items
+     * Método de negocio: Recalcula totales basado en items
      */
     public void recalcularTotales() {
         this.subtotal = items.stream()
@@ -100,7 +99,7 @@ public class Pedido {
     }
 
     /**
-     * Business method: Count total entries
+     * Método de negocio: Cuenta el total de entradas
      */
     public int getTotalEntradas() {
         return items.stream()
@@ -109,7 +108,7 @@ public class Pedido {
     }
 
     /**
-     * Business method: Validate max 4 entries per event
+     * Método de negocio: Valida máximo 4 entradas por evento
      */
     public boolean validarLimiteEntradas(Long eventoId, int cantidadNueva) {
         int entradasActuales = items.stream()
@@ -120,33 +119,33 @@ public class Pedido {
     }
 
     /**
-     * State transition: CREATED → RESERVED
+     * Transición de estado: CREADO → RESERVADO
      */
     public void reservar() {
-        this.estadoPedido.validarTransicion(EstadoPedido.RESERVED);
-        this.estadoPedido = EstadoPedido.RESERVED;
+        this.estadoPedido.validarTransicion(EstadoPedido.RESERVADO);
+        this.estadoPedido = EstadoPedido.RESERVADO;
     }
 
     /**
-     * State transition: RESERVED → CANCELLED
+     * Transición de estado: RESERVADO → CANCELADO
      */
     public void cancelar() {
-        this.estadoPedido.validarTransicion(EstadoPedido.CANCELLED);
-        this.estadoPedido = EstadoPedido.CANCELLED;
+        this.estadoPedido.validarTransicion(EstadoPedido.CANCELADO);
+        this.estadoPedido = EstadoPedido.CANCELADO;
     }
 
     /**
-     * State transition: PAID → REFUNDED
+     * Transición de estado: RESERVADO → REEMBOLSADO
      */
     public void reembolsar() {
-        this.estadoPedido.validarTransicion(EstadoPedido.REFUNDED);
+        this.estadoPedido.validarTransicion(EstadoPedido.REEMBOLSADO);
         this.estadoPago.validarTransicion(EstadoPago.REEMBOLSADO);
-        this.estadoPedido = EstadoPedido.REFUNDED;
+        this.estadoPedido = EstadoPedido.REEMBOLSADO;
         this.estadoPago = EstadoPago.REEMBOLSADO;
     }
 
     /**
-     * Payment state: PENDING → PAID
+     * Transición de estado: PENDIENTE → PAGADO
      */
     public void marcarPagado() {
         this.estadoPago.validarTransicion(EstadoPago.PAGADO);
@@ -154,7 +153,7 @@ public class Pedido {
     }
 
     /**
-     * Payment state: PENDING → FAILED
+     * Transición de estado: PENDIENTE → FALLIDO
      */
     public void marcarPagoFallido() {
         this.estadoPago.validarTransicion(EstadoPago.FALLIDO);
@@ -162,16 +161,16 @@ public class Pedido {
     }
 
     /**
-     * Check if reservation can be renewed
+     * Verifica si la reserva puede renovarse
      */
     public boolean puedeRenovarReserva() {
-        return fechaExpiracionReserva != null 
+        return fechaExpiracionReserva != null
                 && LocalDateTime.now().isAfter(fechaExpiracionReserva)
-                && estadoPedido == EstadoPedido.RESERVED;
+                && estadoPedido == EstadoPedido.RESERVADO;
     }
 
     /**
-     * Add item to order
+     * Añade un item al pedido
      */
     public void agregarItem(ItemPedido item) {
         items.add(item);
@@ -180,7 +179,7 @@ public class Pedido {
     }
 
     /**
-     * Remove item from order
+     * Elimina un item del pedido
      */
     public void removerItem(ItemPedido item) {
         items.remove(item);

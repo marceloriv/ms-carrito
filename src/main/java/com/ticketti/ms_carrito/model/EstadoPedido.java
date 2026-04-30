@@ -8,24 +8,24 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * EstadoPedido - Estados del pedido según ERS RF-3.
- * CREATED → RESERVED → [CANCELLED | REFUNDED]
+ * EstadoPedido - Estados del pedido según ERS RF-3. CREADO → RESERVADO →
+ * [CANCELADO | REEMBOLSADO]
  */
 @Getter
 public enum EstadoPedido {
-    CREATED("Creado"),
-    RESERVED("Reservado"),
-    CANCELLED("Cancelado"),
-    REFUNDED("Reembolsado");
+    CREADO("Creado"),
+    RESERVADO("Reservado"),
+    CANCELADO("Cancelado"),
+    REEMBOLSADO("Reembolsado");
 
     private final String descripcion;
     private Set<EstadoPedido> transicionesPermitidas;
 
     static {
-        CREATED.transicionesPermitidas = EnumSet.of(RESERVED, CANCELLED);
-        RESERVED.transicionesPermitidas = EnumSet.of(CANCELLED, REFUNDED);
-        CANCELLED.transicionesPermitidas = EnumSet.noneOf(EstadoPedido.class);
-        REFUNDED.transicionesPermitidas = EnumSet.noneOf(EstadoPedido.class);
+        CREADO.transicionesPermitidas = EnumSet.of(RESERVADO, CANCELADO);
+        RESERVADO.transicionesPermitidas = EnumSet.of(CANCELADO, REEMBOLSADO);
+        CANCELADO.transicionesPermitidas = EnumSet.noneOf(EstadoPedido.class);
+        REEMBOLSADO.transicionesPermitidas = EnumSet.noneOf(EstadoPedido.class);
     }
 
     EstadoPedido(String descripcion) {
@@ -34,6 +34,7 @@ public enum EstadoPedido {
 
     /**
      * Valida transición de estado según máquina de estados.
+     *
      * @throws CarritoException si la transición no es válida
      */
     public void validarTransicion(EstadoPedido nuevoEstado) {
@@ -50,14 +51,15 @@ public enum EstadoPedido {
     }
 
     private static final Map<String, EstadoPedido> LOOKUP = Map.of(
-            "CREATED", CREATED,
-            "RESERVED", RESERVED,
-            "CANCELLED", CANCELLED,
-            "REFUNDED", REFUNDED
+            "CREADO", CREADO,
+            "RESERVADO", RESERVADO,
+            "CANCELADO", CANCELADO,
+            "REEMBOLSADO", REEMBOLSADO
     );
 
     /**
      * Factory method: Crea estado desde string
+     *
      * @throws IllegalArgumentException si el estado no existe
      */
     public static EstadoPedido fromString(String estado) {

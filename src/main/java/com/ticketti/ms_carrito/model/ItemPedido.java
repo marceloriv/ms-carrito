@@ -8,7 +8,8 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 
 /**
- * ItemPedido - Entidad de línea de pedido (reemplaza DetalleCarrito).
+ * ItemPedido - Entidad de línea de pedido (reemplaza DetalleCarrito). Valida
+ * cantidad y precio en los callbacks JPA (`@PrePersist` / `@PreUpdate`).
  */
 @Entity
 @Table(name = "ITEM_PEDIDO")
@@ -62,8 +63,8 @@ public class ItemPedido {
     /**
      * Factory method to create valid item
      */
-    public static ItemPedido crear(Long eventoId, String tipoEntrada, 
-                                   Integer cantidad, BigDecimal precioUnitario) {
+    public static ItemPedido crear(Long eventoId, String tipoEntrada,
+            Integer cantidad, BigDecimal precioUnitario) {
         if (cantidad > 4) {
             throw new IllegalArgumentException("Máximo 4 entradas por evento");
         }

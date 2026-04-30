@@ -8,8 +8,8 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * IdempotencyRecord - Entidad para garantizar idempotencia global.
- * Aligned with ERS RF-3.
+ * IdempotencyRecord - Entidad para garantizar idempotencia global. Almacena
+ * estado y snapshot de la respuesta para operaciones idénticas.
  */
 @Entity
 @Table(name = "idempotency_records", indexes = {

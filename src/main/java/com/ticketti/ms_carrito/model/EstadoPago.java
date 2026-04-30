@@ -8,9 +8,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * EstadoPago - Estados del pago según ERS RF-6.
- * PENDING → [PAID | FAILED]
- * PAID → REFUNDED
+ * EstadoPago - Máquina de estados para pagos. Transiciones principales:
+ * PENDIENTE → [PAGADO | FALLIDO] PAGADO → REEMBOLSADO
  */
 @Getter
 public enum EstadoPago {
@@ -35,6 +34,7 @@ public enum EstadoPago {
 
     /**
      * Valida transición de estado según máquina de estados.
+     *
      * @throws CarritoException si la transición no es válida
      */
     public void validarTransicion(EstadoPago nuevoEstado) {
@@ -59,6 +59,7 @@ public enum EstadoPago {
 
     /**
      * Factory method: Crea estado desde string
+     *
      * @throws IllegalArgumentException si el estado no existe
      */
     public static EstadoPago fromString(String estado) {
