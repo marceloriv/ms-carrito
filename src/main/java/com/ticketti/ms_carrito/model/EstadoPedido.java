@@ -8,27 +8,27 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * EstadoPago - Máquina de estados para pagos. Transiciones principales:
- * PENDIENTE → [PAGADO | FALLIDO] PAGADO → REEMBOLSADO
+ * EstadoPedido - Estados del pedido según ERS RF-3. CREADO → RESERVADO →
+ * [CANCELADO | REEMBOLSADO]
  */
 @Getter
-public enum EstadoPago {
-    PENDIENTE("Pendiente"),
-    PAGADO("Pagado"),
-    FALLIDO("Fallido"),
+public enum EstadoPedido {
+    CREADO("Creado"),
+    RESERVADO("Reservado"),
+    CANCELADO("Cancelado"),
     REEMBOLSADO("Reembolsado");
 
     private final String descripcion;
-    private Set<EstadoPago> transicionesPermitidas;
+    private Set<EstadoPedido> transicionesPermitidas;
 
     static {
-        PENDIENTE.transicionesPermitidas = EnumSet.of(PAGADO, FALLIDO);
-        PAGADO.transicionesPermitidas = EnumSet.of(REEMBOLSADO);
-        FALLIDO.transicionesPermitidas = EnumSet.of(PENDIENTE);
-        REEMBOLSADO.transicionesPermitidas = EnumSet.noneOf(EstadoPago.class);
+        CREADO.transicionesPermitidas = EnumSet.of(RESERVADO, CANCELADO);
+        RESERVADO.transicionesPermitidas = EnumSet.of(CANCELADO, REEMBOLSADO);
+        CANCELADO.transicionesPermitidas = EnumSet.noneOf(EstadoPedido.class);
+        REEMBOLSADO.transicionesPermitidas = EnumSet.noneOf(EstadoPedido.class);
     }
 
-    EstadoPago(String descripcion) {
+    EstadoPedido(String descripcion) {
         this.descripcion = descripcion;
     }
 
@@ -37,7 +37,7 @@ public enum EstadoPago {
      *
      * @throws CarritoException si la transición no es válida
      */
-    public void validarTransicion(EstadoPago nuevoEstado) {
+    public void validarTransicion(EstadoPedido nuevoEstado) {
         if (!transicionesPermitidas.contains(nuevoEstado)) {
             throw CarritoException.transicionEstadoInvalida(this.name(), nuevoEstado.name());
         }
@@ -50,10 +50,10 @@ public enum EstadoPago {
         return transicionesPermitidas.isEmpty();
     }
 
-    private static final Map<String, EstadoPago> LOOKUP = Map.of(
-            "PENDIENTE", PENDIENTE,
-            "PAGADO", PAGADO,
-            "FALLIDO", FALLIDO,
+    private static final Map<String, EstadoPedido> LOOKUP = Map.of(
+            "CREADO", CREADO,
+            "RESERVADO", RESERVADO,
+            "CANCELADO", CANCELADO,
             "REEMBOLSADO", REEMBOLSADO
     );
 
@@ -62,8 +62,8 @@ public enum EstadoPago {
      *
      * @throws IllegalArgumentException si el estado no existe
      */
-    public static EstadoPago fromString(String estado) {
-        EstadoPago result = LOOKUP.get(estado.toUpperCase());
+    public static EstadoPedido fromString(String estado) {
+        EstadoPedido result = LOOKUP.get(estado.toUpperCase());
         if (result == null) {
             throw new IllegalArgumentException("Estado no válido: " + estado);
         }
