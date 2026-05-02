@@ -16,33 +16,35 @@ import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ticketti.ms_carrito.dto.*;
 import com.ticketti.ms_carrito.exception.CarritoException;
+import com.ticketti.ms_carrito.handler.CarritoExceptionHandler;
 import com.ticketti.ms_carrito.model.CarritoDeCompras;
 import com.ticketti.ms_carrito.model.EstadoCarrito;
 import com.ticketti.ms_carrito.model.EstadoPago;
 import com.ticketti.ms_carrito.service.CarritoService;
 
-@WebMvcTest(CarritoController.class)
-@AutoConfigureMockMvc(addFilters = false)
+@ExtendWith(MockitoExtension.class)
 class CarritoControllerTest {
 
-    @Autowired
     private MockMvc mockMvc;
 
-    @MockitoBean
+    @Mock
     private CarritoService carritoService;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+    @InjectMocks
+    private CarritoController carritoController;
+
+    private ObjectMapper objectMapper = new ObjectMapper();
 
     private CarritoDeCompras carritoMock;
     private static final Long USUARIO_ID = 1L;
@@ -51,12 +53,16 @@ class CarritoControllerTest {
 
     @BeforeEach
     void setUp() {
+        mockMvc = MockMvcBuilders.standaloneSetup(carritoController)
+                .setControllerAdvice(new CarritoExceptionHandler())
+                .build();
+        
         carritoMock = new CarritoDeCompras();
         carritoMock.setIdCarrito(CARRITO_ID);
         carritoMock.setUsuarioId(USUARIO_ID);
         carritoMock.setRolUsuarioId(ROL_USUARIO_ID);
-                carritoMock.setEstadoCarrito(EstadoCarrito.CREADO);
-                carritoMock.setEstadoPago(EstadoPago.PENDIENTE);
+        carritoMock.setEstadoCarrito(EstadoCarrito.CREADO);
+        carritoMock.setEstadoPago(EstadoPago.PENDIENTE);
         carritoMock.setSubtotal(BigDecimal.ZERO);
         carritoMock.setMontoDonacion(BigDecimal.ZERO);
         carritoMock.setTotal(BigDecimal.ZERO);
@@ -124,7 +130,7 @@ class CarritoControllerTest {
 
     @Test
     void iniciarCheckout_DebeRetornar200() throws Exception {
-        CheckoutDto dto = new CheckoutDto(1L, "idempotency-key-test", "token-test", null);
+        CheckoutDto dto = new CheckoutDto(1L, "idempotency-key-test-32-chars-long-valid", "token-test", null);
         when(carritoService.iniciarCheckout(eq(CARRITO_ID), eq(USUARIO_ID), any(CheckoutDto.class)))
                 .thenReturn(carritoMock);
 
