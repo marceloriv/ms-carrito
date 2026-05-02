@@ -1,4 +1,7 @@
+
 package com.ticketti.ms_carrito.dto;
+import com.ticketti.ms_carrito.model.CarritoDeCompras;
+import com.ticketti.ms_carrito.model.DetalleCarrito;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -74,4 +77,34 @@ public class ResumenCarritoDto {
                 .reservaId(pedido.getReservaId())
                 .build();
     }
+
+        public static ResumenCarritoDto fromCarrito(CarritoDeCompras carrito) {
+        List<DetalleCarrito> detalles = Optional.ofNullable(carrito.getDetalles()).orElse(List.of());
+        List<ItemCarritoDto> itemsDto = detalles.stream()
+            .map(detalle -> ItemCarritoDto.builder()
+                .detalleId(detalle.getIdDetalleCarrito())
+                .eventoId(detalle.getEventoId())
+                .tipoEntrada(detalle.getTipoEntradaNombre())
+                .cantidad(detalle.getCantidad())
+                .precioUnitario(detalle.getPrecioUnitario())
+                .subtotal(detalle.getSubtotal())
+                .reservaId(detalle.getIdReserva())
+                .build())
+            .collect(java.util.stream.Collectors.toList());
+
+        return ResumenCarritoDto.builder()
+            .carritoId(carrito.getIdCarrito())
+            .estadoCarrito(carrito.getEstadoCarrito() != null ? carrito.getEstadoCarrito().name() : null)
+            .estadoPago(carrito.getEstadoPago() != null ? carrito.getEstadoPago().name() : null)
+            .items(itemsDto)
+            .subtotal(carrito.getSubtotal())
+            .montoDonacion(carrito.getMontoDonacion())
+            .total(carrito.getTotal())
+            .totalEntradas(carrito.getTotalEntradas())
+            .fechaExpiracionReserva(carrito.getFechaExpiracionReserva())
+            .puedeRenovarReserva(carrito.puedeRenovarReserva())
+            .causaSocialId(carrito.getCausaSocialId())
+            .reservaId(carrito.getReservaId())
+            .build();
+        }
 }
