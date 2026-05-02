@@ -1,4 +1,4 @@
-FROM maven:3.9.4-openjdk-17-slim AS build
+FROM maven:3.9.6-eclipse-temurin-17-alpine AS build
 
 WORKDIR /workspace
 COPY pom.xml .

@@ -3,23 +3,54 @@ services:
     image: mysql:latest
     container_name: mysql
     environment:
-      - MYSQL_ROOT_PASSWORD=root
-      - MYSQL_DATABASE=carrito_db
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: carrito_db
     volumes:
       - mysql_data:/var/lib/mysql
 
+    networks:
+      - ticketti-network
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: ticketti-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - ticketti-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
   app:
     build: .
     container_name: app
     restart: on-failure
     depends_on:
       - mysql
+      - rabbitmq
     ports:
       - "8083:8083"
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/carrito_db?createDatabaseIfNotExist=true
-      - SPRING_DATASOURCE_USERNAME=root
-      - SPRING_DATASOURCE_PASSWORD=root
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/carrito_db?createDatabaseIfNotExist=true"
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+
+    networks:
+      - ticketti-network
 
 volumes:
   mysql_data:
+  rabbitmq-data:
+
+networks:
+  ticketti-network:
+    driver: bridge
