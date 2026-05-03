@@ -2,6 +2,7 @@ package com.ticketti.ms_carrito.model;
 
 import java.time.LocalDateTime;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -21,7 +22,8 @@ public class RegistroIdempotencia {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    private String Key;
+    @Column(name = "idempotency_key")
+    private String claveIdempotencia;
     private EstadoIdempotencia estado = EstadoIdempotencia.PENDIENTE;
     private LocalDateTime creacionIdempotencia;
     private LocalDateTime expiracionIdempotencia;
