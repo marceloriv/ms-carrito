@@ -11,7 +11,7 @@ services:
     networks:
       - ticketti-network
   rabbitmq:
-    image: rabbitmq:3.13-management
+    image: rabbitmq:4-management
     container_name: ticketti-rabbitmq
     ports:
       - "5672:5672"
