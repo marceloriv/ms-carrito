@@ -1,8 +1,11 @@
 package com.ticketti.ms_carrito.service;
 
 import java.time.LocalDateTime;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -47,7 +50,11 @@ public class OutboxRelayService {
         for (OutboxEvent event : pendientes) {
             try {
                 String routingKey = event.getRoutingKey() != null ? event.getRoutingKey() : event.getType();
-                rabbitTemplate.convertAndSend(EXCHANGE_NAME, routingKey, event.getPayload());
+                MessageProperties messageProperties = new MessageProperties();
+                messageProperties.setContentType(MessageProperties.CONTENT_TYPE_JSON);
+                messageProperties.setContentEncoding(StandardCharsets.UTF_8.name());
+                Message message = new Message(event.getPayload().getBytes(StandardCharsets.UTF_8), messageProperties);
+                rabbitTemplate.send(EXCHANGE_NAME, routingKey, message);
 
                 event.setStatus(OutboxEvent.Status.SENT);
                 event.setSentAt(LocalDateTime.now());
