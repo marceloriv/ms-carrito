@@ -401,6 +401,24 @@ public class CarritoService {
     }
 
     @Transactional(readOnly = true)
+    public CarritoDeCompras obtenerCarrito(Long carritoId, Long usuarioId) {
+        CarritoDeCompras carrito = carritoRepository.findById(carritoId)
+                .orElseThrow(() -> CarritoException.carritoNoEncontrado(carritoId));
+        validarPropiedadCarrito(carrito, usuarioId);
+        return carrito;
+    }
+
+    @Transactional(readOnly = true)
+    public CarritoDeCompras buscarCarritoActivo(Long usuarioId) {
+        List<CarritoDeCompras> carritos = carritoRepository.findByUsuarioIdAndEstadoCarrito(
+                usuarioId, EstadoCarrito.CREADO);
+        if (carritos.isEmpty()) {
+            return null;
+        }
+        return carritos.isEmpty() ? null : carritos.get(0);
+    }
+
+    @Transactional(readOnly = true)
     public List<CarritoDeCompras> listarCarritosPorUsuario(Long usuarioId) {
         return carritoRepository.findByUsuarioId(usuarioId);
     }
