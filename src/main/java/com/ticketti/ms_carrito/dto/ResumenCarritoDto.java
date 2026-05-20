@@ -48,37 +48,11 @@ public class ResumenCarritoDto {
         private Long reservaId;
     }
 
-    public static ResumenCarritoDto fromCarrito(Pedido pedido) {
-        List<ItemPedido> itemsPedido = Optional.ofNullable(pedido.getItems()).orElse(List.of());
-        List<ItemCarritoDto> itemsDto = itemsPedido.stream()
-                .map(item -> ItemCarritoDto.builder()
-                        .detalleId(item.getId())
-                        .eventoId(item.getEventoId())
-                        .tipoEntrada(item.getTipoEntrada())
-                        .cantidad(item.getCantidad())
-                        .precioUnitario(item.getPrecioUnitario())
-                        .subtotal(item.getSubtotal())
-                        .reservaId(item.getReservaId())
-                        .build())
-                .toList();
-
-        return ResumenCarritoDto.builder()
-                .carritoId(pedido.getId())
-                .estadoCarrito(pedido.getEstadoPedido().name())
-                .estadoPago(pedido.getEstadoPago().name())
-                .items(itemsDto)
-                .subtotal(pedido.getSubtotal())
-                .montoDonacion(pedido.getMontoDonacion())
-                .total(pedido.getTotal())
-                .totalEntradas(pedido.getTotalEntradas())
-                .fechaExpiracionReserva(pedido.getFechaExpiracionReserva())
-                .puedeRenovarReserva(pedido.puedeRenovarReserva())
-                .causaSocialId(pedido.getCausaSocialId())
-                .reservaId(pedido.getReservaId())
-                .build();
-    }
-
-        public static ResumenCarritoDto fromCarrito(CarritoDeCompras carrito) {
+    /**
+     * Convierte un {@link CarritoDeCompras} (modelo vigente en el servicio) a DTO.
+     * Compatible con campos de {@link DetalleCarrito}.
+     */
+    public static ResumenCarritoDto fromCarrito(CarritoDeCompras carrito) {
         List<DetalleCarrito> detalles = Optional.ofNullable(carrito.getDetalles()).orElse(List.of());
         List<ItemCarritoDto> itemsDto = detalles.stream()
             .map(detalle -> ItemCarritoDto.builder()
@@ -106,5 +80,5 @@ public class ResumenCarritoDto {
             .causaSocialId(carrito.getCausaSocialId())
             .reservaId(carrito.getReservaId())
             .build();
-        }
+    }
 }
