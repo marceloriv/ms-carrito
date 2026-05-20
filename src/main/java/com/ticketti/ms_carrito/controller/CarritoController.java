@@ -57,7 +57,22 @@ public class CarritoController {
                 .body(ApiRespuestaDto.exito("Carrito creado exitosamente", carrito));
     }
 
-    @Operation(summary = "Listar carritos del usuario", description = "Obtiene el historial de compras del usuario")
+    @Operation(summary = "Obtener carrito por ID", description = "Obtiene un carrito especifico por su ID")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Carrito obtenido exitosamente"),
+            @ApiResponse(responseCode = "404", description = "Carrito no encontrado")
+    })
+    @GetMapping("/obtener/{id}")
+    public ResponseEntity<ApiRespuestaDto<CarritoDeCompras>> obtenerCarrito(
+            @Parameter(description = "ID del carrito", required = true) @PathVariable Long id,
+            @Parameter(description = "ID del usuario", required = true)
+            @RequestHeader("X-Usuario-Id") Long usuarioId) {
+        log.info("GET /api/v1/Carrito/obtener/{} - Usuario: {}", id, usuarioId);
+        CarritoDeCompras carrito = carritoService.obtenerCarrito(id, usuarioId);
+        return ResponseEntity.ok(ApiRespuestaDto.exito("Carrito obtenido", carrito));
+    }
+
+    @Operation(summary = "Listar carritos del usuario", description = "Obtiene el historial de carritos del usuario")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Lista de carritos obtenida exitosamente"),
             @ApiResponse(responseCode = "204", description = "No hay carritos")
