@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
  */
 @Entity
 @Table(name = "idempotency_records", indexes = {
-    @Index(name = "idx_idempotency_key", columnList = "idempotencyKey", unique = true),
+    @Index(name = "idx_idempotency_key", columnList = "idempotency_key", unique = true),
     @Index(name = "idx_idempotency_status", columnList = "status")
 })
 @Data

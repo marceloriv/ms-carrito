@@ -165,7 +165,7 @@ public class Pedido {
      */
     public boolean puedeRenovarReserva() {
         return fechaExpiracionReserva != null
-                && LocalDateTime.now().isAfter(fechaExpiracionReserva)
+                && LocalDateTime.now().isBefore(fechaExpiracionReserva)
                 && estadoPedido == EstadoPedido.RESERVADO;
     }
 
