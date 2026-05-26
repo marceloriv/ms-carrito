@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,17 +25,19 @@ import com.ticketti.ms_carrito.model.CarritoDeCompras;
 import com.ticketti.ms_carrito.model.DetalleCarrito;
 import com.ticketti.ms_carrito.model.EstadoCarrito;
 import com.ticketti.ms_carrito.model.EstadoPago;
-import com.ticketti.ms_carrito.model.IdempotencyRecord;
 import com.ticketti.ms_carrito.model.OutboxEvent;
 import com.ticketti.ms_carrito.model.Pago;
 import com.ticketti.ms_carrito.model.Reserva;
 import com.ticketti.ms_carrito.repository.CarritoRepository;
 import com.ticketti.ms_carrito.repository.DetalleCarritoRepository;
-import com.ticketti.ms_carrito.repository.IdempotencyRecordRepository;
 import com.ticketti.ms_carrito.repository.OutboxEventRepository;
 import com.ticketti.ms_carrito.repository.PagoRepository;
 import com.ticketti.ms_carrito.repository.ReservaRepository;
 
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -44,20 +46,27 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class CarritoService {
 
-    private static final int MAX_ENTRADAS = 4;
     private static final int MINUTOS_RESERVA = 5;
     private static final int MINUTOS_RENOVACION = 2;
     private static final BigDecimal PORCENTAJE_REEMBOLSO = new BigDecimal("0.85");
+    private static final int MAX_ENTRADAS = 4;
+    private static final int WEBHOOK_TOLERANCE_MINUTES = 5;
 
-    private final CarritoRepository carritoRepository;
-    private final DetalleCarritoRepository detalleRepository;
-    private final ReservaRepository reservaRepository;
-    private final PagoRepository pagoRepository;
-    private final IdempotencyRecordRepository idempotencyRepository;
-    private final OutboxEventRepository outboxRepository;
-    private final EventoClient eventoClient;
-    private final ObjectMapper objectMapper;
+     private final CarritoRepository carritoRepository;
+     private final DetalleCarritoRepository detalleRepository;
+     private final ReservaRepository reservaRepository;
+     private final PagoRepository pagoRepository;
+     private final OutboxEventRepository outboxRepository;
+     private final EventoClient eventoClient;
+     private final IdempotencyService idempotencyService;
+     private final PagoWebhookService pagoWebhookService;
+     private final ObjectMapper objectMapper;
+     
+     private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
+    /**
+     * Crea un carrito vacío para el usuario indicado.
+     */
     @Transactional
     public CarritoDeCompras crearCarrito(Long usuarioId, Long rolUsuarioId) {
         log.info("Creando nuevo carrito para usuario: {}, rol: {}", usuarioId, rolUsuarioId);
@@ -78,8 +87,13 @@ public class CarritoService {
         return carritoRepository.save(carrito);
     }
 
+    /**
+     * Agrega o actualiza una entrada dentro del carrito.
+     */
     @Transactional
     public CarritoDeCompras agregarEntrada(Long carritoId, Long usuarioId, AgregarEntradaDto dto) {
+
+        validarEntrada(dto);
         log.info("Agregando entrada al carrito {}: {} x {}", carritoId, dto.getTipoEntrada(), dto.getCantidad());
 
         CarritoDeCompras carrito = carritoRepository.findById(carritoId)
@@ -128,6 +142,9 @@ public class CarritoService {
         return carritoRepository.save(carrito);
     }
 
+    /**
+     * Elimina una entrada específica del carrito.
+     */
     @Transactional
     public CarritoDeCompras eliminarEntrada(Long carritoId, Long detalleId, Long usuarioId) {
         log.info("Eliminando detalle {} del carrito {}", detalleId, carritoId);
@@ -138,7 +155,7 @@ public class CarritoService {
         validarPropiedadCarrito(carrito, usuarioId);
 
         DetalleCarrito detalle = detalleRepository.findById(detalleId)
-                .orElseThrow(() -> new CarritoException("Detalle no encontrado: " + detalleId));
+            .orElseThrow(() -> CarritoException.detalleNoEncontrado(detalleId));
 
         if (!detalle.getIdCarritoDeCompras().equals(carritoId)) {
             throw new CarritoException("El detalle no pertenece al carrito");
@@ -153,6 +170,9 @@ public class CarritoService {
         return carritoRepository.save(carrito);
     }
 
+    /**
+     * Vacía el carrito y libera la reserva asociada si existe.
+     */
     @Transactional
     public CarritoDeCompras vaciarCarrito(Long carritoId, Long usuarioId) {
         log.info("Vaciando carrito {}", carritoId);
@@ -185,8 +205,13 @@ public class CarritoService {
         return carritoRepository.save(carrito);
     }
 
+    /**
+     * Inicia el checkout usando la clave idempotente enviada por el cliente.
+     */
     @Transactional
     public CarritoDeCompras iniciarCheckout(Long carritoId, Long usuarioId, CheckoutDto dto) {
+
+        validarEntrada(dto);
         log.info("Iniciando checkout del carrito {} con causa social {}", carritoId, dto.getCausaSocialId());
 
         CarritoDeCompras carrito = carritoRepository.findById(carritoId)
@@ -204,11 +229,9 @@ public class CarritoService {
         }
 
         int totalEntradas = carrito.getTotalEntradas();
-        String idempotencyKey = UUID.randomUUID().toString();
+        String idempotencyKey = dto.getIdempotencyKey();
 
-        if (idempotencyRepository.existsByKey(idempotencyKey)) {
-            throw CarritoException.idempotenciaInvalida();
-        }
+        idempotencyService.registrarSolicitud(idempotencyKey, dto.getRequestHash());
 
         ReservaRequestDto reservaRequest = new ReservaRequestDto();
         reservaRequest.setCantidadEntradas(totalEntradas);
@@ -222,14 +245,15 @@ public class CarritoService {
                 reservaId = Long.valueOf(reservaIdStr);
                 eventoId = detalle.getEventoId();
                 detalle.setIdReserva(reservaId);
-            } catch (Exception e) {
+            } catch (RuntimeException e) {
                 if (reservaId != null) {
                     try {
                         eventoClient.liberarReserva(detalle.getEventoId(), String.valueOf(reservaId));
-                    } catch (Exception ex) {
+                    } catch (RuntimeException ex) {
                         log.error("Error liberando reserva: {}", ex.getMessage());
                     }
                 }
+                idempotencyService.marcarFallido(idempotencyKey);
                 throw CarritoException.stockNoDisponible(detalle.getEventoId());
             }
         }
@@ -252,17 +276,14 @@ public class CarritoService {
         carrito.setFechaExpiracionReserva(LocalDateTime.now().plusMinutes(MINUTOS_RESERVA));
         carrito.setFechaUltActualizacion(LocalDateTime.now());
 
-        IdempotencyRecord record = new IdempotencyRecord();
-        record.setKey(idempotencyKey);
-        record.setStatus(IdempotencyRecord.Status.PENDING);
-        record.setExpiresAt(LocalDateTime.now().plusHours(24));
-        idempotencyRepository.save(record);
-
         detalleRepository.saveAll(carrito.getDetalles());
 
         return carritoRepository.save(carrito);
     }
 
+    /**
+     * Renueva la reserva del carrito por el tiempo configurado.
+     */
     @Transactional
     public CarritoDeCompras renovarReserva(Long carritoId, Long usuarioId) {
         log.info("Renovando reserva del carrito {}", carritoId);
@@ -292,8 +313,12 @@ public class CarritoService {
         return carritoRepository.save(carrito);
     }
 
-    @Transactional
+    /**
+     * Procesa el webhook de pago y delega la persistencia transaccional.
+     */
     public CarritoDeCompras procesarWebhookPago(Long carritoId, WebhookPagoDto dto) {
+
+        validarEntrada(dto);
         log.info("Procesando webhook de pago para carrito {}", carritoId);
 
         validarWebhook(dto);
@@ -301,11 +326,11 @@ public class CarritoService {
         CarritoDeCompras carrito = carritoRepository.findById(carritoId)
                 .orElseThrow(() -> CarritoException.carritoNoEncontrado(carritoId));
 
-        if (!"aprobado".equalsIgnoreCase(dto.getEstado())) {
-            carrito.setEstadoCarrito(EstadoCarrito.FALLIDO);
-            carrito.setEstadoPago(EstadoPago.FALLIDO);
-            carrito.setFechaUltActualizacion(LocalDateTime.now());
+        if (carrito.getEstadoCarrito() == EstadoCarrito.PAGADO) {
+            return carrito;
+        }
 
+        if (!"aprobado".equalsIgnoreCase(dto.getEstado())) {
             if (carrito.getReservaId() != null) {
                 Reserva reserva = reservaRepository.findById(carrito.getReservaId()).orElse(null);
                 if (reserva != null) {
@@ -319,37 +344,18 @@ public class CarritoService {
                 }
             }
 
-            return carritoRepository.save(carrito);
+            return pagoWebhookService.procesarPagoRechazado(carrito);
         }
 
-        carrito.setEstadoCarrito(EstadoCarrito.PAGADO);
-        carrito.setEstadoPago(EstadoPago.PAGADO);
-        carrito.setFechaUltActualizacion(LocalDateTime.now());
-        carrito = carritoRepository.save(carrito);
-
-        Pago pago = new Pago();
-        pago.setMontoTotal(carrito.getTotal());
-        pago.setCarritoIdCarrito(carritoId);
-        pago.setReservaIdReserva(carrito.getReservaId());
-        pago.setIdempotencyKey(carrito.getIdempotencyKey());
-        pago.setTokenPasarela(dto.getToken());
-        pago.setEstadoPago(Pago.EstadoPago.PAGO_APROBADO);
-        pagoRepository.save(pago);
-
-        guardarOutboxEvent(carrito, "pago.aprobado");
-
-        if (carrito.getIdempotencyKey() != null) {
-            idempotencyRepository.findByKey(carrito.getIdempotencyKey()).ifPresent(record -> {
-                record.setStatus(IdempotencyRecord.Status.COMPLETED);
-                idempotencyRepository.save(record);
-            });
-        }
-
-        return carrito;
+        return pagoWebhookService.procesarPagoAprobado(carrito, dto);
     }
 
+    /**
+     * Procesa una devolución y calcula el monto reembolsable.
+     */
     @Transactional
     public DevolucionResponseDto procesarDevolucion(Long carritoId, Long usuarioId, DevolucionRequestDto dto) {
+        validarEntrada(dto);
         log.info("Procesando devolucion del carrito {}", carritoId);
 
         CarritoDeCompras carrito = carritoRepository.findById(carritoId)
@@ -383,11 +389,11 @@ public class CarritoService {
 
         Pago pago = pagoRepository.findByCarritoIdCarrito(carritoId).orElse(null);
         if (pago != null) {
-            pago.setEstadoPago(Pago.EstadoPago.PAGO_RECHAZADO);
+            pago.setEstadoPago(EstadoPago.REEMBOLSADO);
             pagoRepository.save(pago);
         }
 
-        guardarOutboxEvent(carrito, "compra.revertida");
+        guardarEventoOutbox(carrito, "compra.revertida");
 
         return DevolucionResponseDto.builder()
                 .pedidoId(carritoId)
@@ -400,6 +406,9 @@ public class CarritoService {
                 .build();
     }
 
+    /**
+     * Obtiene un carrito concreto validando propiedad.
+     */
     @Transactional(readOnly = true)
     public CarritoDeCompras obtenerCarrito(Long carritoId, Long usuarioId) {
         CarritoDeCompras carrito = carritoRepository.findById(carritoId)
@@ -408,6 +417,9 @@ public class CarritoService {
         return carrito;
     }
 
+    /**
+     * Busca el carrito activo del usuario.
+     */
     @Transactional(readOnly = true)
     public CarritoDeCompras buscarCarritoActivo(Long usuarioId) {
         List<CarritoDeCompras> carritos = carritoRepository.findByUsuarioIdAndEstadoCarrito(
@@ -418,11 +430,17 @@ public class CarritoService {
         return carritos.isEmpty() ? null : carritos.get(0);
     }
 
+    /**
+     * Lista todos los carritos del usuario.
+     */
     @Transactional(readOnly = true)
     public List<CarritoDeCompras> listarCarritosPorUsuario(Long usuarioId) {
         return carritoRepository.findByUsuarioId(usuarioId);
     }
 
+    /**
+     * Obtiene el resumen calculado del carrito.
+     */
     @Transactional(readOnly = true)
     public ResumenCarritoDto obtenerResumen(Long carritoId, Long usuarioId) {
         CarritoDeCompras carrito = carritoRepository.findById(carritoId)
@@ -433,25 +451,44 @@ public class CarritoService {
         return ResumenCarritoDto.fromCarrito(carrito);
     }
 
+    /**
+     * Verifica que el carrito pertenezca al usuario indicado.
+     */
     private void validarPropiedadCarrito(CarritoDeCompras carrito, Long usuarioId) {
         if (!carrito.getUsuarioId().equals(usuarioId)) {
             throw CarritoException.accesoNoAutorizado();
         }
     }
 
+    /**
+     * Valida un DTO de entrada usando Bean Validation.
+     */
+    private void validarEntrada(Object dto) {
+        Set<ConstraintViolation<Object>> violations = validator.validate(dto);
+        if (!violations.isEmpty()) {
+            throw new ConstraintViolationException(violations);
+        }
+    }
+
+    /**
+     * Valida las reglas de negocio del webhook de pago.
+     */
     private void validarWebhook(WebhookPagoDto dto) {
         if (dto.getTimestamp() == null || dto.getNonce() == null) {
             throw CarritoException.webhookInvalido("falta timestamp o nonce");
         }
 
         LocalDateTime timestamp = LocalDateTime.parse(dto.getTimestamp());
-        if (timestamp.isBefore(LocalDateTime.now().minusMinutes(5)) ||
-            timestamp.isAfter(LocalDateTime.now().plusMinutes(5))) {
+        if (timestamp.isBefore(LocalDateTime.now().minusMinutes(WEBHOOK_TOLERANCE_MINUTES)) ||
+            timestamp.isAfter(LocalDateTime.now().plusMinutes(WEBHOOK_TOLERANCE_MINUTES))) {
             throw CarritoException.webhookInvalido("timestamp fuera de rango");
         }
     }
 
-    private void guardarOutboxEvent(CarritoDeCompras carrito, String tipo) {
+    /**
+     * Persiste un evento en la tabla outbox.
+     */
+    private void guardarEventoOutbox(CarritoDeCompras carrito, String tipo) {
         try {
             String payload = objectMapper.writeValueAsString(carrito);
 
