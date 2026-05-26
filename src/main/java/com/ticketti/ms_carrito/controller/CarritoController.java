@@ -3,6 +3,8 @@ package com.ticketti.ms_carrito.controller;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -27,17 +29,18 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 
 @RestController
 @RequestMapping("/api/v1/Carrito")
-@RequiredArgsConstructor
-@Slf4j
 @Tag(name = "Carrito", description = "API para gestion de carrito de compras y orquestacion de pagos")
 public class CarritoController {
 
+    private static final Logger log = LoggerFactory.getLogger(CarritoController.class);
     private final CarritoService carritoService;
+
+    public CarritoController(CarritoService carritoService) {
+        this.carritoService = carritoService;
+    }
 
     @Operation(summary = "Crear nuevo carrito", description = "Inicia una nueva compra creando un carrito vacio")
     @ApiResponses(value = {
