@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.List;
 
 import jakarta.annotation.Nonnull;
+import io.jsonwebtoken.JwtException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -83,7 +84,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 				SecurityContextHolder.getContext().setAuthentication(authToken);
 				log.debug("Autenticacion exitosa para usuario: {}, rol: {}", userId, role);
 			}
-		} catch (Exception e) {
+		} catch (JwtException | IllegalArgumentException e) {
 			log.error("Error procesando JWT: {}", e.getMessage());
 			response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
 			response.getWriter().write("Error de autenticacion");
