@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.dao.DataAccessException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,8 @@ public class OutboxRelayService {
 
     private static final String EXCHANGE_NAME = "ticketti.exchange";
     private static final int BATCH_SIZE = 50;
+    private static final int MAX_RETRIES = 5;
+    private static final int BASE_BACKOFF_SECONDS = 5;
 
     private final OutboxEventRepository outboxRepository;
     private final RabbitTemplate rabbitTemplate;
@@ -28,14 +31,30 @@ public class OutboxRelayService {
         this.rabbitTemplate = rabbitTemplate;
     }
 
+    /**
+     * Publica los eventos pendientes o reintentables del outbox en RabbitMQ.
+     * Los eventos se procesan en orden de antigüedad y se marcan como enviados
+     * o fallidos según el resultado de la publicación.
+     */
     @Scheduled(fixedDelay = 5000)
     @Transactional
     public void publicarEventosPendientes() {
+        LocalDateTime ahora = LocalDateTime.now();
         List<OutboxEvent> pendientes = outboxRepository.findByStatus(OutboxEvent.Status.PENDING)
+            .stream()
+            .filter(event -> listoParaProcesar(event, ahora))
+            .sorted((a, b) -> a.getCreatedAt().compareTo(b.getCreatedAt()))
+            .limit(BATCH_SIZE)
+            .toList();
+
+        List<OutboxEvent> reintentos = outboxRepository.findByStatus(OutboxEvent.Status.FAILED)
                 .stream()
+            .filter(event -> listoParaProcesar(event, ahora))
                 .sorted((a, b) -> a.getCreatedAt().compareTo(b.getCreatedAt()))
                 .limit(BATCH_SIZE)
                 .toList();
+
+        pendientes = List.copyOf(concatenar(pendientes, reintentos));
 
         if (pendientes.isEmpty()) {
             return;
@@ -55,13 +74,55 @@ public class OutboxRelayService {
 
                 procesados++;
                 log.debug("Evento outbox {} publicado con routing key {}", event.getId(), routingKey);
-            } catch (Exception e) {
+            } catch (org.springframework.amqp.AmqpException | DataAccessException e) {
                 log.error("Error publicando evento outbox {}: {}", event.getId(), e.getMessage());
+                event.incrementarRetry();
                 event.setStatus(OutboxEvent.Status.FAILED);
                 outboxRepository.save(event);
+
+                if (!event.puedeReintentar(MAX_RETRIES)) {
+                    log.warn("Evento outbox {} agotó reintentos y queda en FAILED", event.getId());
+                }
             }
         }
 
         log.info("Outbox relay completado. Procesados: {}", procesados);
+    }
+
+    /**
+     * Determina si un evento está listo para enviarse en este ciclo del relay.
+     *
+     * @param event evento a evaluar.
+     * @param ahora instante actual.
+     * @return {@code true} si el evento puede enviarse; en caso contrario, {@code false}.
+     */
+    private boolean listoParaProcesar(OutboxEvent event, LocalDateTime ahora) {
+        if (event.getStatus() == OutboxEvent.Status.PENDING) {
+            return true;
+        }
+
+        if (event.getStatus() != OutboxEvent.Status.FAILED) {
+            return false;
+        }
+
+        if (!event.puedeReintentar(MAX_RETRIES)) {
+            return false;
+        }
+
+        long backoffSeconds = (long) Math.min(Math.pow(2, event.getRetryCount()) * BASE_BACKOFF_SECONDS, 300);
+        return event.getCreatedAt().plusSeconds(backoffSeconds).isBefore(ahora);
+    }
+
+    /**
+     * Combina dos listas de eventos en una sola lista mutable.
+     *
+     * @param primero primera lista de eventos.
+     * @param segundo segunda lista de eventos.
+     * @return lista combinada con el contenido de ambas listas.
+     */
+    private List<OutboxEvent> concatenar(List<OutboxEvent> primero, List<OutboxEvent> segundo) {
+        List<OutboxEvent> combinados = new java.util.ArrayList<>(primero);
+        combinados.addAll(segundo);
+        return combinados;
     }
 }
