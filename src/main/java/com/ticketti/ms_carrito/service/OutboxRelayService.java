@@ -8,6 +8,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ticketti.ms_carrito.messaging.CompraConfirmadaEvent;
 import com.ticketti.ms_carrito.model.OutboxEvent;
 import com.ticketti.ms_carrito.repository.OutboxEventRepository;
 
@@ -22,10 +24,12 @@ public class OutboxRelayService {
 
     private final OutboxEventRepository outboxRepository;
     private final RabbitTemplate rabbitTemplate;
+    private final ObjectMapper objectMapper;
 
-    public OutboxRelayService(OutboxEventRepository outboxRepository, RabbitTemplate rabbitTemplate) {
+    public OutboxRelayService(OutboxEventRepository outboxRepository, RabbitTemplate rabbitTemplate, ObjectMapper objectMapper) {
         this.outboxRepository = outboxRepository;
         this.rabbitTemplate = rabbitTemplate;
+        this.objectMapper = objectMapper;
     }
 
     @Scheduled(fixedDelay = 5000)
@@ -47,7 +51,14 @@ public class OutboxRelayService {
         for (OutboxEvent event : pendientes) {
             try {
                 String routingKey = event.getRoutingKey() != null ? event.getRoutingKey() : event.getType();
-                rabbitTemplate.convertAndSend(EXCHANGE_NAME, routingKey, event.getPayload());
+                try {
+                    CompraConfirmadaEvent payload = objectMapper.readValue(event.getPayload(), CompraConfirmadaEvent.class);
+                    rabbitTemplate.convertAndSend(EXCHANGE_NAME, routingKey, payload);
+                } catch (Exception deserEx) {
+                    // Fallback: enviar el payload original (JSON string) para compatibilidad
+                    log.warn("No se pudo deserializar payload a CompraConfirmadaEvent (id {}): {}. Enviando payload bruto.", event.getId(), deserEx.getMessage());
+                    rabbitTemplate.convertAndSend(EXCHANGE_NAME, routingKey, event.getPayload());
+                }
 
                 event.setStatus(OutboxEvent.Status.SENT);
                 event.setSentAt(LocalDateTime.now());
