@@ -10,47 +10,29 @@ services:
 
     networks:
       - ticketti-network
-  rabbitmq:
-    image: rabbitmq:4-management
-    container_name: ticketti-rabbitmq
-    ports:
-      - "5672:5672"
-      - "15672:15672"
-    environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
-    volumes:
-      - rabbitmq-data:/var/lib/rabbitmq
-    networks:
-      - ticketti-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
   app:
     build: .
     container_name: app
     restart: on-failure
     depends_on:
       - mysql
-      - rabbitmq
     ports:
-      - "8083:8083"
+      - "8082:8082"
+    networks:
+      - ticketti-network
     environment:
+      SERVER_PORT: 8082
       SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/carrito_db?createDatabaseIfNotExist=true"
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: root
-
-    networks:
-      - ticketti-network
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: guest
+      SPRING_RABBITMQ_PASSWORD: guest
 
 volumes:
   mysql_data:
-  rabbitmq-data:
 
 networks:
   ticketti-network:
-    driver: bridge
+    external: true
