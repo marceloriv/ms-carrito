@@ -12,7 +12,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ticketti.ms_carrito.client.CausaSocialClient;
 import com.ticketti.ms_carrito.client.EventoClient;
+import com.ticketti.ms_carrito.client.UsuarioClient;
+import com.ticketti.ms_carrito.client.dto.CausaSocialInfoDto;
+import com.ticketti.ms_carrito.client.dto.EventoInfoDto;
+import com.ticketti.ms_carrito.client.dto.UsuarioInfoDto;
 import com.ticketti.ms_carrito.dto.AgregarEntradaDto;
 import com.ticketti.ms_carrito.dto.CheckoutDto;
 import com.ticketti.ms_carrito.dto.DevolucionRequestDto;
@@ -21,6 +26,7 @@ import com.ticketti.ms_carrito.dto.ReservaRequestDto;
 import com.ticketti.ms_carrito.dto.ResumenCarritoDto;
 import com.ticketti.ms_carrito.dto.WebhookPagoDto;
 import com.ticketti.ms_carrito.exception.CarritoException;
+import com.ticketti.ms_carrito.messaging.CompraConfirmadaEvent;
 import com.ticketti.ms_carrito.model.CarritoDeCompras;
 import com.ticketti.ms_carrito.model.DetalleCarrito;
 import com.ticketti.ms_carrito.model.EstadoCarrito;
@@ -57,6 +63,8 @@ public class CarritoService {
     private final OutboxEventRepository outboxRepository;
     private final EventoClient eventoClient;
     private final ObjectMapper objectMapper;
+    private final UsuarioClient usuarioClient;
+    private final CausaSocialClient causaSocialClient;
 
     @Transactional
     public CarritoDeCompras crearCarrito(Long usuarioId, Long rolUsuarioId) {
@@ -453,7 +461,8 @@ public class CarritoService {
 
     private void guardarOutboxEvent(CarritoDeCompras carrito, String tipo) {
         try {
-            String payload = objectMapper.writeValueAsString(carrito);
+            CompraConfirmadaEvent evento = construirEventoConfirmacion(carrito);
+            String payload = objectMapper.writeValueAsString(evento);
 
             OutboxEvent event = new OutboxEvent();
             event.setAggregateId(carrito.getIdCarrito());
@@ -466,8 +475,71 @@ public class CarritoService {
             outboxRepository.save(event);
             log.info("Outbox event guardado: {} para carrito {}", tipo, carrito.getIdCarrito());
         } catch (JsonProcessingException e) {
-            log.error("Error serializando carrito para outbox: {}", e.getMessage());
+            log.error("Error serializando evento para outbox: {}", e.getMessage());
             throw new CarritoException("Error procesando evento");
         }
+    }
+
+    private CompraConfirmadaEvent construirEventoConfirmacion(CarritoDeCompras carrito) {
+        CompraConfirmadaEvent evt = new CompraConfirmadaEvent();
+        evt.setIdCarrito(carrito.getIdCarrito());
+        evt.setPagoId(carrito.getIdPago());
+        evt.setUsuarioId(carrito.getUsuarioId());
+        evt.setCausaSocialId(carrito.getCausaSocialId());
+        evt.setTotal(carrito.getTotal());
+        evt.setMontoDonacion(carrito.getMontoDonacion());
+        // intentar obtener eventoId desde el primer detalle del carrito si existe
+        if (carrito.getDetalles() != null && !carrito.getDetalles().isEmpty()) {
+            evt.setEventoId(carrito.getDetalles().get(0).getEventoId().longValue());
+        } else {
+            evt.setEventoId(null);
+        }
+
+        try {
+            if (carrito.getUsuarioId() != null) {
+                UsuarioInfoDto usuario = usuarioClient.buscarUsuario(carrito.getUsuarioId());
+                if (usuario != null) {
+                    evt.setCorreoUsuario(usuario.getCorreo());
+                    evt.setNombreUsuario(usuario.getNombre());
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("No se pudo obtener usuario para enriquecimiento: {}", ex.getMessage());
+        }
+
+        try {
+            Long eventoId = null;
+            if (carrito.getDetalles() != null && !carrito.getDetalles().isEmpty()) {
+                eventoId = carrito.getDetalles().get(0).getEventoId();
+            } else if (carrito.getReservaId() != null) {
+                eventoId = carrito.getReservaId();
+            }
+
+            if (eventoId != null) {
+                EventoInfoDto evento = eventoClient.buscarEvento(eventoId.intValue());
+                if (evento != null) {
+                    evt.setNombreEvento(evento.getNombre());
+                    evt.setFechaEvento(evento.getFecha() != null ? evento.getFecha().toString() : null);
+                    if (evento.getRecinto() != null) {
+                        evt.setLugarEvento(evento.getRecinto().getNombre());
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("No se pudo obtener evento para enriquecimiento: {}", ex.getMessage());
+        }
+
+        try {
+            if (carrito.getCausaSocialId() != null) {
+                CausaSocialInfoDto causa = causaSocialClient.buscarCausa(carrito.getCausaSocialId());
+                if (causa != null) {
+                    evt.setNombreCausa(causa.getNombre());
+                }
+            }
+        } catch (Exception ex) {
+            log.warn("No se pudo obtener causa social para enriquecimiento: {}", ex.getMessage());
+        }
+
+        return evt;
     }
 }
