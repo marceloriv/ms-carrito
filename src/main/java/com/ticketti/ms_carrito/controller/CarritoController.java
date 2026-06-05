@@ -17,7 +17,13 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.ticketti.ms_carrito.dto.*;
+import com.ticketti.ms_carrito.dto.AgregarEntradaDto;
+import com.ticketti.ms_carrito.dto.ApiRespuestaDto;
+import com.ticketti.ms_carrito.dto.CheckoutDto;
+import com.ticketti.ms_carrito.dto.DevolucionRequestDto;
+import com.ticketti.ms_carrito.dto.DevolucionResponseDto;
+import com.ticketti.ms_carrito.dto.ResumenCarritoDto;
+import com.ticketti.ms_carrito.dto.WebhookPagoDto;
 import com.ticketti.ms_carrito.model.CarritoDeCompras;
 import com.ticketti.ms_carrito.service.CarritoService;
 
@@ -44,9 +50,9 @@ public class CarritoController {
 
     @Operation(summary = "Crear nuevo carrito", description = "Inicia una nueva compra creando un carrito vacio")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "201", description = "Carrito creado exitosamente",
-                    content = @Content(schema = @Schema(implementation = CarritoDeCompras.class))),
-            @ApiResponse(responseCode = "400", description = "Datos invalidos")
+        @ApiResponse(responseCode = "201", description = "Carrito creado exitosamente",
+                content = @Content(schema = @Schema(implementation = CarritoDeCompras.class))),
+        @ApiResponse(responseCode = "400", description = "Datos invalidos")
     })
     @PostMapping("/crear")
     public ResponseEntity<ApiRespuestaDto<CarritoDeCompras>> crearCarrito(
@@ -62,8 +68,8 @@ public class CarritoController {
 
     @Operation(summary = "Obtener carrito por ID", description = "Obtiene un carrito especifico por su ID")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Carrito obtenido exitosamente"),
-            @ApiResponse(responseCode = "404", description = "Carrito no encontrado")
+        @ApiResponse(responseCode = "200", description = "Carrito obtenido exitosamente"),
+        @ApiResponse(responseCode = "404", description = "Carrito no encontrado")
     })
     @GetMapping("/obtener/{id}")
     public ResponseEntity<ApiRespuestaDto<CarritoDeCompras>> obtenerCarrito(
@@ -77,8 +83,8 @@ public class CarritoController {
 
     @Operation(summary = "Listar carritos del usuario", description = "Obtiene el historial de carritos del usuario")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Lista de carritos obtenida exitosamente"),
-            @ApiResponse(responseCode = "204", description = "No hay carritos")
+        @ApiResponse(responseCode = "200", description = "Lista de carritos obtenida exitosamente"),
+        @ApiResponse(responseCode = "204", description = "No hay carritos")
     })
     @GetMapping("/listar")
     public ResponseEntity<ApiRespuestaDto<List<CarritoDeCompras>>> listarCarritos(
@@ -94,9 +100,9 @@ public class CarritoController {
 
     @Operation(summary = "Obtener resumen del carrito", description = "Obtiene el detalle completo del carrito")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Resumen obtenido exitosamente",
-                    content = @Content(schema = @Schema(implementation = ResumenCarritoDto.class))),
-            @ApiResponse(responseCode = "404", description = "Carrito no encontrado")
+        @ApiResponse(responseCode = "200", description = "Resumen obtenido exitosamente",
+                content = @Content(schema = @Schema(implementation = ResumenCarritoDto.class))),
+        @ApiResponse(responseCode = "404", description = "Carrito no encontrado")
     })
     @GetMapping("/resumen/{id}")
     public ResponseEntity<ApiRespuestaDto<ResumenCarritoDto>> obtenerResumen(
@@ -110,9 +116,9 @@ public class CarritoController {
 
     @Operation(summary = "Agregar entrada al carrito", description = "Agrega una entrada al carrito existente")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Entrada agregada exitosamente"),
-            @ApiResponse(responseCode = "400", description = "Limite de entradas excedido o datos invalidos"),
-            @ApiResponse(responseCode = "404", description = "Carrito no encontrado")
+        @ApiResponse(responseCode = "200", description = "Entrada agregada exitosamente"),
+        @ApiResponse(responseCode = "400", description = "Limite de entradas excedido o datos invalidos"),
+        @ApiResponse(responseCode = "404", description = "Carrito no encontrado")
     })
     @PostMapping("/{id}/entradas")
     public ResponseEntity<ApiRespuestaDto<CarritoDeCompras>> agregarEntrada(
@@ -127,8 +133,8 @@ public class CarritoController {
 
     @Operation(summary = "Eliminar entrada del carrito", description = "Elimina una entrada especifica del carrito")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Entrada eliminada exitosamente"),
-            @ApiResponse(responseCode = "404", description = "Carrito o entrada no encontrada")
+        @ApiResponse(responseCode = "200", description = "Entrada eliminada exitosamente"),
+        @ApiResponse(responseCode = "404", description = "Carrito o entrada no encontrada")
     })
     @DeleteMapping("/{id}/entradas/{detalleId}")
     public ResponseEntity<ApiRespuestaDto<CarritoDeCompras>> eliminarEntrada(
@@ -143,9 +149,9 @@ public class CarritoController {
 
     @Operation(summary = "Actualizar cantidad de entradas", description = "Actualiza el carrito respetando maximo 4 entradas")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Carrito actualizado exitosamente"),
-            @ApiResponse(responseCode = "400", description = "Limite excedido o datos invalidos"),
-            @ApiResponse(responseCode = "404", description = "Carrito no encontrado")
+        @ApiResponse(responseCode = "200", description = "Carrito actualizado exitosamente"),
+        @ApiResponse(responseCode = "400", description = "Limite excedido o datos invalidos"),
+        @ApiResponse(responseCode = "404", description = "Carrito no encontrado")
     })
     @PutMapping("/actualizar/{id}")
     public ResponseEntity<ApiRespuestaDto<CarritoDeCompras>> actualizarCarrito(
@@ -160,10 +166,10 @@ public class CarritoController {
 
     @Operation(summary = "Checkout - Iniciar pago", description = "Reserva stock, genera idempotencia y prepara para pago")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Checkout iniciado exitosamente"),
-            @ApiResponse(responseCode = "400", description = "Carrito vacio o sin stock"),
-            @ApiResponse(responseCode = "409", description = "Error de idempotencia"),
-            @ApiResponse(responseCode = "404", description = "Carrito no encontrado")
+        @ApiResponse(responseCode = "200", description = "Checkout iniciado exitosamente"),
+        @ApiResponse(responseCode = "400", description = "Carrito vacio o sin stock"),
+        @ApiResponse(responseCode = "409", description = "Error de idempotencia"),
+        @ApiResponse(responseCode = "404", description = "Carrito no encontrado")
     })
     @PostMapping("/checkout/{id}")
     public ResponseEntity<ApiRespuestaDto<CarritoDeCompras>> iniciarCheckout(
@@ -178,8 +184,8 @@ public class CarritoController {
 
     @Operation(summary = "Renovar reserva de stock", description = "Renueva la reserva por 2 minutos adicionales (una sola vez)")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Reserva renovada exitosamente"),
-            @ApiResponse(responseCode = "410", description = "No se puede renovar la reserva")
+        @ApiResponse(responseCode = "200", description = "Reserva renovada exitosamente"),
+        @ApiResponse(responseCode = "410", description = "No se puede renovar la reserva")
     })
     @PostMapping("/renovar/{id}")
     public ResponseEntity<ApiRespuestaDto<CarritoDeCompras>> renovarReserva(
@@ -193,9 +199,9 @@ public class CarritoController {
 
     @Operation(summary = "Webhook de confirmacion de pago", description = "Recibe confirmacion asincrona de la pasarela de pagos")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Pago procesado exitosamente"),
-            @ApiResponse(responseCode = "401", description = "Webhook invalido"),
-            @ApiResponse(responseCode = "404", description = "Carrito no encontrado")
+        @ApiResponse(responseCode = "200", description = "Pago procesado exitosamente"),
+        @ApiResponse(responseCode = "401", description = "Webhook invalido"),
+        @ApiResponse(responseCode = "404", description = "Carrito no encontrado")
     })
     @PostMapping("/webhooks/pago")
     public ResponseEntity<ApiRespuestaDto<CarritoDeCompras>> procesarWebhookPago(
@@ -207,9 +213,9 @@ public class CarritoController {
 
     @Operation(summary = "Solicitar devolucion", description = "Procesa reembolso del 85% (10% donacion no reembolsable)")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Devolucion procesada exitosamente"),
-            @ApiResponse(responseCode = "403", description = "Devolucion no permitida"),
-            @ApiResponse(responseCode = "404", description = "Carrito no encontrado")
+        @ApiResponse(responseCode = "200", description = "Devolucion procesada exitosamente"),
+        @ApiResponse(responseCode = "403", description = "Devolucion no permitida"),
+        @ApiResponse(responseCode = "404", description = "Carrito no encontrado")
     })
     @PostMapping("/devoluciones/{id}")
     public ResponseEntity<ApiRespuestaDto<DevolucionResponseDto>> procesarDevolucion(
@@ -224,8 +230,8 @@ public class CarritoController {
 
     @Operation(summary = "Vaciar carrito", description = "Elimina el carrito completo y libera reservas")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Carrito vaciado exitosamente"),
-            @ApiResponse(responseCode = "404", description = "Carrito no encontrado")
+        @ApiResponse(responseCode = "200", description = "Carrito vaciado exitosamente"),
+        @ApiResponse(responseCode = "404", description = "Carrito no encontrado")
     })
     @DeleteMapping("/vaciar")
     public ResponseEntity<ApiRespuestaDto<Map<String, String>>> vaciarCarrito(
