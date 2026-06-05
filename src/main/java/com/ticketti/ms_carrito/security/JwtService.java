@@ -28,7 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class JwtService {
 
-	@Value("${jwt.secret:ticketti-secret-key-2024-for-jwt-signing-and-verification-only}")
+	@Value("${jwt.secret:clave-secreta-super-larga-de-minimo-32-caracteres}")
 	private String secretKey;
 
 	private SecretKey getSigningKey() {
