@@ -47,7 +47,7 @@ public class Pago {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "ESTADO_PAGO", length = 20)
-    private EstadoPago estadoPago = EstadoPago.PAGO_PENDIENTE;
+    private EstadoPago estadoPago = EstadoPago.PENDIENTE;
 
     @Column(name = "IDEMPOTENCY_KEY", length = 255)
     private String idempotencyKey;
@@ -55,7 +55,4 @@ public class Pago {
     @Column(name = "TOKEN_PASARELA", length = 500)
     private String tokenPasarela;
 
-    public enum EstadoPago {
-        PAGO_PENDIENTE, PAGO_APROBADO, PAGO_RECHAZADO
-    }
 }

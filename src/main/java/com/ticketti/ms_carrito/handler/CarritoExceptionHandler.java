@@ -2,6 +2,7 @@ package com.ticketti.ms_carrito.handler;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +15,8 @@ import com.ticketti.ms_carrito.dto.ApiRespuestaDto;
 import com.ticketti.ms_carrito.exception.CarritoException;
 
 import jakarta.persistence.OptimisticLockException;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -26,22 +29,16 @@ public class CarritoExceptionHandler {
 
     @ExceptionHandler(CarritoException.class)
     public ResponseEntity<ApiRespuestaDto<Void>> handleCarritoException(CarritoException ex) {
-        String mensaje = ex.getMessage().toLowerCase();
-        HttpStatus status = HttpStatus.BAD_REQUEST;
-
-        if (mensaje.contains("no encontrado")) {
-            status = HttpStatus.NOT_FOUND;
-        } else if (mensaje.contains("expirado") || mensaje.contains("renovada")) {
-            status = HttpStatus.GONE;
-        } else if (mensaje.contains("idempotencia")) {
-            status = HttpStatus.CONFLICT;
-        } else if (mensaje.contains("pago no aprobado")) {
-            status = HttpStatus.PAYMENT_REQUIRED;
-        } else if (mensaje.contains("devolución no permitida")) {
-            status = HttpStatus.FORBIDDEN;
-        } else if (mensaje.contains("webhook inválido")) {
-            status = HttpStatus.UNAUTHORIZED;
-        }
+        HttpStatus status = switch (ex.getCodigo()) {
+            case CARRO_NO_ENCONTRADO -> HttpStatus.NOT_FOUND;
+            case DETALLE_NO_ENCONTRADO -> HttpStatus.NOT_FOUND;
+            case RESERVA_EXPIRADA, RESERVA_YA_RENOVADA -> HttpStatus.GONE;
+            case IDEMPOTENCIA_INVALIDA -> HttpStatus.CONFLICT;
+            case PAGO_NO_APROBADO -> HttpStatus.PAYMENT_REQUIRED;
+            case DEVOLUCION_NO_PERMITIDA -> HttpStatus.FORBIDDEN;
+            case WEBHOOK_INVALIDO, HMAC_INVALIDO, TIMESTAMP_INVALIDO, NONCE_REPETIDO -> HttpStatus.UNAUTHORIZED;
+            default -> HttpStatus.BAD_REQUEST;
+        };
 
         return ResponseEntity.status(status)
                 .body(ApiRespuestaDto.error(ex.getMessage()));
@@ -57,6 +54,19 @@ public class CarritoExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiRespuestaDto.error("Error de validación", errors));
     }
+
+        @ExceptionHandler(ConstraintViolationException.class)
+        public ResponseEntity<ApiRespuestaDto<Map<String, String>>> handleConstraintViolationException(
+            ConstraintViolationException ex) {
+        Map<String, String> errors = new HashMap<>();
+        Set<ConstraintViolation<?>> violations = ex.getConstraintViolations();
+        violations.forEach(violation -> errors.put(
+            violation.getPropertyPath().toString(),
+            violation.getMessage()));
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            .body(ApiRespuestaDto.error("Error de validación", errors));
+        }
 
     @ExceptionHandler({OptimisticLockException.class, ObjectOptimisticLockingFailureException.class})
     public ResponseEntity<ApiRespuestaDto<Void>> handleOptimisticLockException(Exception ex) {

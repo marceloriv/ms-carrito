@@ -16,7 +16,12 @@ public class WebhookPagoDto {
     @NotBlank(message = "El estado es obligatorio")
     private String estado;
 
+    @NotBlank(message = "El token es obligatorio")
     private String token;
+
+    @NotBlank(message = "El timestamp es obligatorio")
     private String timestamp;
+
+    @NotBlank(message = "El nonce es obligatorio")
     private String nonce;
 }

@@ -1,15 +1,13 @@
 
 package com.ticketti.ms_carrito.dto;
-import com.ticketti.ms_carrito.model.CarritoDeCompras;
-import com.ticketti.ms_carrito.model.DetalleCarrito;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-import com.ticketti.ms_carrito.model.ItemPedido;
-import com.ticketti.ms_carrito.model.Pedido;
+import com.ticketti.ms_carrito.model.CarritoDeCompras;
+import com.ticketti.ms_carrito.model.DetalleCarrito;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
