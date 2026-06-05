@@ -52,7 +52,7 @@ class CarritoControllerTest {
 
     private CarritoDeCompras carritoMock;
     private static final Long USUARIO_ID = 1L;
-    private static final Long ROL_USUARIO_ID = 2L;
+    private static final String ROL_USUARIO = "CLIENTE";
     private static final Long CARRITO_ID = 1L;
 
         @SuppressWarnings("unused")
@@ -65,7 +65,7 @@ class CarritoControllerTest {
         carritoMock = new CarritoDeCompras();
         carritoMock.setIdCarrito(CARRITO_ID);
         carritoMock.setUsuarioId(USUARIO_ID);
-        carritoMock.setRolUsuarioId(ROL_USUARIO_ID);
+        carritoMock.setRolUsuarioId(0L);
         carritoMock.setEstadoCarrito(EstadoCarrito.CREADO);
         carritoMock.setEstadoPago(EstadoPago.PENDIENTE);
         carritoMock.setSubtotal(BigDecimal.ZERO);
@@ -75,11 +75,11 @@ class CarritoControllerTest {
 
     @Test
     void crearCarrito_DebeRetornar201() throws Exception {
-        when(carritoService.crearCarrito(USUARIO_ID, ROL_USUARIO_ID)).thenReturn(carritoMock);
+        when(carritoService.crearCarrito(USUARIO_ID, ROL_USUARIO)).thenReturn(carritoMock);
 
         mockMvc.perform(post("/api/v1/Carrito/crear")
                 .header("X-Usuario-Id", USUARIO_ID)
-                .header("X-Rol-Usuario-Id", ROL_USUARIO_ID))
+                .header("X-Rol-Usuario-Id", ROL_USUARIO))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.exito").value(true))
                 .andExpect(jsonPath("$.data.idCarrito").value(CARRITO_ID));

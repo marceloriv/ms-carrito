@@ -79,7 +79,7 @@ class CarritoServiceTest {
 
     private CarritoDeCompras carrito;
     private static final Long USUARIO_ID = 1L;
-    private static final Long ROL_USUARIO_ID = 2L;
+    private static final String ROL_USUARIO = "CLIENTE";
     private static final Long CARRITO_ID = 1L;
     private static final Long EVENTO_ID = 1L;
 
@@ -90,7 +90,7 @@ class CarritoServiceTest {
         carrito = new CarritoDeCompras();
         carrito.setIdCarrito(CARRITO_ID);
         carrito.setUsuarioId(USUARIO_ID);
-        carrito.setRolUsuarioId(ROL_USUARIO_ID);
+        carrito.setRolUsuarioId(0L);
         carrito.setEstadoCarrito(EstadoCarrito.CREADO);
         carrito.setEstadoPago(EstadoPago.PENDIENTE);
         carrito.setSubtotal(BigDecimal.ZERO);
@@ -104,11 +104,11 @@ class CarritoServiceTest {
     void crearCarrito_DebeRetornarCarritoConEstadoCreado() {
         when(carritoRepository.save(any(CarritoDeCompras.class))).thenReturn(carrito);
 
-        CarritoDeCompras resultado = carritoService.crearCarrito(USUARIO_ID, ROL_USUARIO_ID);
+        CarritoDeCompras resultado = carritoService.crearCarrito(USUARIO_ID, ROL_USUARIO);
 
         assertNotNull(resultado);
         assertEquals(USUARIO_ID, resultado.getUsuarioId());
-        assertEquals(ROL_USUARIO_ID, resultado.getRolUsuarioId());
+        assertEquals(0L, resultado.getRolUsuarioId());
         assertEquals(EstadoCarrito.CREADO, resultado.getEstadoCarrito());
         assertEquals(EstadoPago.PENDIENTE, resultado.getEstadoPago());
     }
