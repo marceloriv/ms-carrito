@@ -2,7 +2,6 @@ package com.ticketti.ms_carrito.security;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.List;
 
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -32,13 +31,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
 	private final JwtService jwtService;
 
-	private static final List<String> PUBLIC_PATHS = List.of(
-			"/api/v1/webhooks",
-			"/actuator/health",
-			"/actuator/info",
-			"/swagger-ui",
-			"/v3/api-docs"
-	);
 
 	@Override
 	protected void doFilterInternal(
@@ -47,15 +39,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 			@Nonnull FilterChain filterChain
 	) throws ServletException, IOException {
 
-		if (isPublicPath(request.getRequestURI())) {
-			filterChain.doFilter(request, response);
-			return;
-		}
-
 		final String authHeader = request.getHeader("Authorization");
 
+		// Si no hay token, continúa sin establecer auth.
+		// Spring Security decidirá según las reglas de la ruta (permitAll / authenticated).
 		if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-			log.warn("Header Authorization no valido o ausente en: {}", request.getRequestURI());
+			log.debug("Sin header Authorization en: {}", request.getRequestURI());
 			filterChain.doFilter(request, response);
 			return;
 		}
@@ -63,38 +52,32 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 		final String jwt = authHeader.substring(7);
 
 		try {
-			if (!jwtService.isTokenValid(jwt) || !jwtService.validateTokenClaims(jwt)) {
-				log.error("Token JWT invalido o claims incompletos");
-				response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-				response.getWriter().write("Token JWT invalido");
-				return;
-			}
+			if (jwtService.isTokenValid(jwt) && jwtService.validateTokenClaims(jwt)) {
+				// JWT válido: poblar el SecurityContext
+				String correo = jwtService.extractCorreo(jwt);
+				String role   = jwtService.extractRole(jwt);
 
-			// El subject del BFF es el correo del usuario
-			String correo = jwtService.extractCorreo(jwt);
-			String role   = jwtService.extractRole(jwt);
-
-			if (SecurityContextHolder.getContext().getAuthentication() == null) {
-				UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-						correo,
-						null,
-						Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role))
-				);
-				authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-				SecurityContextHolder.getContext().setAuthentication(authToken);
-				log.debug("Autenticacion exitosa para: {}, rol: {}", correo, role);
+				if (SecurityContextHolder.getContext().getAuthentication() == null) {
+					UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+							correo,
+							null,
+							Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role))
+					);
+					authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+					SecurityContextHolder.getContext().setAuthentication(authToken);
+					log.debug("Autenticacion exitosa para: {}, rol: {}", correo, role);
+				}
+			} else {
+				// JWT presente pero inválido: NO bloqueamos aquí.
+				// Rutas con permitAll() pasarán; rutas authenticated() serán bloqueadas por Spring Security.
+				log.warn("Token JWT invalido o claims incompletos para: {}", request.getRequestURI());
 			}
 		} catch (JwtException | IllegalArgumentException e) {
-			log.error("Error procesando JWT: {}", e.getMessage());
-			response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-			response.getWriter().write("Error de autenticacion");
-			return;
+			// Token malformado: igual dejamos que Spring Security decida.
+			log.warn("Error procesando JWT en {}: {}", request.getRequestURI(), e.getMessage());
 		}
 
 		filterChain.doFilter(request, response);
 	}
 
-	private boolean isPublicPath(String uri) {
-		return PUBLIC_PATHS.stream().anyMatch(uri::startsWith);
-	}
 }
