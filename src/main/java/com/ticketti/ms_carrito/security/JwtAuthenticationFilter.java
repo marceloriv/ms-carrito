@@ -23,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * Filtro de autenticación JWT.
  * Extrae token del header Authorization y valida claims.
+ * Compatible con tokens del BFF: subject=correo, claim "rol".
  */
 @Component
 @RequiredArgsConstructor
@@ -46,22 +47,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 			@Nonnull FilterChain filterChain
 	) throws ServletException, IOException {
 
-		final String authHeader = request.getHeader("Authorization");
-		final String jwt;
-		final String userId;
-
 		if (isPublicPath(request.getRequestURI())) {
 			filterChain.doFilter(request, response);
 			return;
 		}
 
+		final String authHeader = request.getHeader("Authorization");
+
 		if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-			log.warn("Header Authorization no valido o ausente");
+			log.warn("Header Authorization no valido o ausente en: {}", request.getRequestURI());
 			filterChain.doFilter(request, response);
 			return;
 		}
 
-		jwt = authHeader.substring(7);
+		final String jwt = authHeader.substring(7);
 
 		try {
 			if (!jwtService.isTokenValid(jwt) || !jwtService.validateTokenClaims(jwt)) {
@@ -71,18 +70,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 				return;
 			}
 
-			userId = String.valueOf(jwtService.extractUserId(jwt));
-			String role = jwtService.extractRole(jwt);
+			// El subject del BFF es el correo del usuario
+			String correo = jwtService.extractCorreo(jwt);
+			String role   = jwtService.extractRole(jwt);
 
 			if (SecurityContextHolder.getContext().getAuthentication() == null) {
 				UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-						userId,
+						correo,
 						null,
 						Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role))
 				);
 				authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 				SecurityContextHolder.getContext().setAuthentication(authToken);
-				log.debug("Autenticacion exitosa para usuario: {}, rol: {}", userId, role);
+				log.debug("Autenticacion exitosa para: {}, rol: {}", correo, role);
 			}
 		} catch (JwtException | IllegalArgumentException e) {
 			log.error("Error procesando JWT: {}", e.getMessage());
