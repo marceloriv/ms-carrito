@@ -76,12 +76,12 @@ public class CarritoService {
      * Crea un carrito vacío para el usuario indicado.
      */
     @Transactional
-    public CarritoDeCompras crearCarrito(Long usuarioId, Long rolUsuarioId) {
-        log.info("Creando nuevo carrito para usuario: {}, rol: {}", usuarioId, rolUsuarioId);
+    public CarritoDeCompras crearCarrito(Long usuarioId, String rolUsuario) {
+        log.info("Creando nuevo carrito para usuario: {}, rol: {}", usuarioId, rolUsuario);
 
         CarritoDeCompras carrito = new CarritoDeCompras();
         carrito.setUsuarioId(usuarioId);
-        carrito.setRolUsuarioId(rolUsuarioId);
+        carrito.setRolUsuarioId(0L); // valor placeholder — el rol real es el nombre del JWT
         carrito.setEstadoCarrito(EstadoCarrito.CREADO);
         carrito.setEstadoPago(EstadoPago.PENDIENTE);
         carrito.setSubtotal(BigDecimal.ZERO);
