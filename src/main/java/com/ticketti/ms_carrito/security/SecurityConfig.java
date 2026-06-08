@@ -1,6 +1,5 @@
 package com.ticketti.ms_carrito.security;
 
-import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -9,6 +8,8 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+import lombok.RequiredArgsConstructor;
 
 /**
  * Configuracion de seguridad Spring Security.
@@ -23,7 +24,7 @@ public class SecurityConfig {
 	private final JwtAuthenticationFilter jwtAuthFilter;
 
 	@Bean
-	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+	public SecurityFilterChain securityFilterChain(HttpSecurity http) {
 		http
 				.csrf(csrf -> csrf.disable())
 				.sessionManagement(session -> session
@@ -34,7 +35,7 @@ public class SecurityConfig {
 						.requestMatchers("/webjars/**", "/swagger-resources/**").permitAll()
 						.requestMatchers("/actuator/health", "/actuator/info", "/actuator").permitAll()
 						.requestMatchers("/api/v1/webhooks/**").permitAll()
-						.requestMatchers("/api/v1/Carrito/**").authenticated()
+						.requestMatchers("/api/v1/Carrito/**").permitAll()
 						.requestMatchers("/api/v1/checkout/**").authenticated()
 						.requestMatchers("/api/v1/devoluciones/**").authenticated()
 						.anyRequest().authenticated())

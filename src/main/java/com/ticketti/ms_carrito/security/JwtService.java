@@ -18,37 +18,44 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * Servicio para validacion y extraccion de claims JWT.
+ * Compatible con tokens emitidos por el BFF:
+ * - subject : correo del usuario (String)
+ * - claim   : "rol"
+ * - sin issuer ni audience estrictos
  * Algoritmo: HS256.
  */
 @Service
 @Slf4j
 public class JwtService {
 
-	@Value("${jwt.secret:test-secret-key-ms-carrito-2026-very-secure}")
+	@Value("${jwt.secret:clave-secreta-super-larga-de-minimo-32-caracteres}")
 	private String secretKey;
-
-	@Value("${jwt.issuer:ms-carrito}")
-	private String issuer;
-
-	@Value("${jwt.audience:ms-carrito}")
-	private String audience;
 
 	private SecretKey getSigningKey() {
 		return Keys.hmacShaKeyFor(secretKey.getBytes(StandardCharsets.UTF_8));
 	}
 
-	public Long getUserIdFromContext() {
+	// ── Métodos de contexto ────────────────────────────────────────────────
+
+	/**
+	 * Devuelve el correo del usuario autenticado desde el SecurityContext.
+	 * El subject del token BFF es el correo, no un ID numérico.
+	 */
+	public String getCorreoFromContext() {
 		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 		if (authentication == null || !authentication.isAuthenticated()) {
 			throw new SecurityException("Usuario no autenticado");
 		}
 		Object principal = authentication.getPrincipal();
-		if (principal instanceof String userIdStr) {
-			return Long.parseLong(userIdStr);
+		if (principal instanceof String correo) {
+			return correo;
 		}
 		throw new SecurityException("Formato de usuario invalido");
 	}
 
+	/**
+	 * Devuelve el rol del usuario autenticado desde el SecurityContext.
+	 */
 	public String getRoleFromContext() {
 		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 		if (authentication == null || !authentication.isAuthenticated()) {
@@ -56,33 +63,28 @@ public class JwtService {
 		}
 		return authentication.getAuthorities().stream()
 				.findFirst()
-				.map(grantedAuthority -> grantedAuthority.getAuthority().replace("ROLE_", ""))
+				.map(ga -> ga.getAuthority().replace("ROLE_", ""))
 				.orElseThrow(() -> new SecurityException("Rol no encontrado"));
 	}
 
-	public Long extractUserId(String token) {
-		return Long.parseLong(extractClaim(token, Claims::getSubject));
+	// ── Extracción de claims ───────────────────────────────────────────────
+
+	/** Devuelve el correo del usuario (subject del token BFF). */
+	public String extractCorreo(String token) {
+		return extractClaim(token, Claims::getSubject);
 	}
 
+	/** Devuelve el rol desde el claim "rol" (formato BFF). */
 	public String extractRole(String token) {
-		return extractClaim(token, claims -> claims.get("role", String.class));
+		return extractClaim(token, claims -> claims.get("rol", String.class));
 	}
 
 	public Date extractExpiration(String token) {
 		return extractClaim(token, Claims::getExpiration);
 	}
 
-	public String extractIssuer(String token) {
-		return extractClaim(token, Claims::getIssuer);
-	}
-
-	public String extractAudience(String token) {
-		return extractClaim(token, claims -> claims.getAudience().iterator().next());
-	}
-
 	public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
-		final Claims claims = extractAllClaims(token);
-		return claimsResolver.apply(claims);
+		return claimsResolver.apply(extractAllClaims(token));
 	}
 
 	private Claims extractAllClaims(String token) {
@@ -93,14 +95,15 @@ public class JwtService {
 				.getPayload();
 	}
 
+	// ── Validación ─────────────────────────────────────────────────────────
+
+	/**
+	 * Valida que el token no haya expirado y tenga subject y rol presentes.
+	 * No valida issuer ni audience — el BFF no los incluye.
+	 */
 	public boolean isTokenValid(String token) {
 		try {
-			final String extractedIssuer = extractIssuer(token);
-			final String extractedAudience = extractAudience(token);
-
-			return extractedIssuer.equals(issuer)
-					&& extractedAudience.equals(audience)
-					&& !isTokenExpired(token);
+			return extractCorreo(token) != null && !isTokenExpired(token);
 		} catch (Exception e) {
 			log.error("Error validando token: {}", e.getMessage());
 			return false;
@@ -115,10 +118,8 @@ public class JwtService {
 		try {
 			Claims claims = extractAllClaims(token);
 			return claims.getSubject() != null
-					&& claims.get("role") != null
-					&& claims.getExpiration() != null
-					&& claims.getIssuer() != null
-					&& claims.getAudience() != null;
+					&& claims.get("rol") != null
+					&& claims.getExpiration() != null;
 		} catch (Exception e) {
 			log.error("Token invalido: {}", e.getMessage());
 			return false;

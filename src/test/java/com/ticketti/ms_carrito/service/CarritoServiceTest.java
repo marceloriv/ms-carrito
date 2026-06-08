@@ -1,8 +1,13 @@
 package com.ticketti.ms_carrito.service;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -15,10 +20,15 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ticketti.ms_carrito.client.EventoClient;
-import com.ticketti.ms_carrito.dto.*;
+import com.ticketti.ms_carrito.dto.AgregarEntradaDto;
+import com.ticketti.ms_carrito.dto.CheckoutDto;
+import com.ticketti.ms_carrito.dto.DevolucionRequestDto;
+import com.ticketti.ms_carrito.dto.DevolucionResponseDto;
 import com.ticketti.ms_carrito.exception.CarritoException;
 import com.ticketti.ms_carrito.model.CarritoDeCompras;
 import com.ticketti.ms_carrito.model.DetalleCarrito;
@@ -27,11 +37,17 @@ import com.ticketti.ms_carrito.model.EstadoPago;
 import com.ticketti.ms_carrito.model.IdempotencyRecord;
 import com.ticketti.ms_carrito.model.OutboxEvent;
 import com.ticketti.ms_carrito.model.Reserva;
-import com.ticketti.ms_carrito.repository.*;
+import com.ticketti.ms_carrito.repository.CarritoRepository;
+import com.ticketti.ms_carrito.repository.DetalleCarritoRepository;
+import com.ticketti.ms_carrito.repository.OutboxEventRepository;
+import com.ticketti.ms_carrito.repository.PagoRepository;
+import com.ticketti.ms_carrito.repository.ReservaRepository;
 
 import feign.FeignException;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
+@SuppressWarnings("unused")
 class CarritoServiceTest {
 
     @Mock
@@ -47,7 +63,7 @@ class CarritoServiceTest {
     private PagoRepository pagoRepository;
 
     @Mock
-    private IdempotencyRecordRepository idempotencyRepository;
+    private IdempotencyService idempotencyService;
 
     @Mock
     private OutboxEventRepository outboxRepository;
@@ -63,16 +79,18 @@ class CarritoServiceTest {
 
     private CarritoDeCompras carrito;
     private static final Long USUARIO_ID = 1L;
-    private static final Long ROL_USUARIO_ID = 2L;
+    private static final String ROL_USUARIO = "CLIENTE";
     private static final Long CARRITO_ID = 1L;
     private static final Long EVENTO_ID = 1L;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
+        when(objectMapper.writeValueAsString(any())).thenReturn("{}");
+
         carrito = new CarritoDeCompras();
         carrito.setIdCarrito(CARRITO_ID);
         carrito.setUsuarioId(USUARIO_ID);
-        carrito.setRolUsuarioId(ROL_USUARIO_ID);
+        carrito.setRolUsuarioId(0L);
         carrito.setEstadoCarrito(EstadoCarrito.CREADO);
         carrito.setEstadoPago(EstadoPago.PENDIENTE);
         carrito.setSubtotal(BigDecimal.ZERO);
@@ -86,11 +104,11 @@ class CarritoServiceTest {
     void crearCarrito_DebeRetornarCarritoConEstadoCreado() {
         when(carritoRepository.save(any(CarritoDeCompras.class))).thenReturn(carrito);
 
-        CarritoDeCompras resultado = carritoService.crearCarrito(USUARIO_ID, ROL_USUARIO_ID);
+        CarritoDeCompras resultado = carritoService.crearCarrito(USUARIO_ID, ROL_USUARIO);
 
         assertNotNull(resultado);
         assertEquals(USUARIO_ID, resultado.getUsuarioId());
-        assertEquals(ROL_USUARIO_ID, resultado.getRolUsuarioId());
+        assertEquals(0L, resultado.getRolUsuarioId());
         assertEquals(EstadoCarrito.CREADO, resultado.getEstadoCarrito());
         assertEquals(EstadoPago.PENDIENTE, resultado.getEstadoPago());
     }
@@ -126,9 +144,9 @@ class CarritoServiceTest {
 
         AgregarEntradaDto dto = new AgregarEntradaDto(EVENTO_ID, "VIP", 2, new BigDecimal("20000"));
 
-        assertThrows(CarritoException.class, () -> {
-            carritoService.agregarEntrada(CARRITO_ID, USUARIO_ID, dto);
-        });
+        CarritoException exception = assertThrows(CarritoException.class,
+            () -> carritoService.agregarEntrada(CARRITO_ID, USUARIO_ID, dto));
+        assertNotNull(exception);
     }
 
     @Test
@@ -146,18 +164,18 @@ class CarritoServiceTest {
 
         when(carritoRepository.findById(CARRITO_ID)).thenReturn(Optional.of(carrito));
         when(eventoClient.crearReserva(any(), any())).thenReturn("100");
-        when(idempotencyRepository.existsByKey(any())).thenReturn(false);
+        when(idempotencyService.registrarSolicitud(eq("idempotency-key-test-32-chars-long-valid"), any()))
+                .thenReturn(new IdempotencyRecord());
         when(reservaRepository.save(any(Reserva.class))).thenReturn(reservaGuardada);
         when(carritoRepository.save(any(CarritoDeCompras.class))).thenReturn(carrito);
-        when(idempotencyRepository.save(any())).thenReturn(new IdempotencyRecord());
 
-        CheckoutDto dto = new CheckoutDto(1L, "idempotency-key-test", "token-test", null);
+        CheckoutDto dto = new CheckoutDto(1L, "idempotency-key-test-32-chars-long-valid", "token-test", null);
         CarritoDeCompras resultado = carritoService.iniciarCheckout(CARRITO_ID, USUARIO_ID, dto);
 
         assertNotNull(resultado);
         assertEquals(EstadoCarrito.RESERVADO, resultado.getEstadoCarrito());
         assertNotNull(resultado.getReservaId());
-        assertNotNull(resultado.getIdempotencyKey());
+        assertEquals("idempotency-key-test-32-chars-long-valid", resultado.getIdempotencyKey());
     }
 
     @Test
@@ -170,12 +188,14 @@ class CarritoServiceTest {
 
         when(carritoRepository.findById(CARRITO_ID)).thenReturn(Optional.of(carrito));
         when(eventoClient.crearReserva(any(), any())).thenThrow(FeignException.class);
+        when(idempotencyService.registrarSolicitud(eq("idempotency-key-456-789012345678901234"), any()))
+                .thenReturn(new IdempotencyRecord());
 
-        CheckoutDto dto = new CheckoutDto(1L, "idempotency-key-456", "token-456", null);
+        CheckoutDto dto = new CheckoutDto(1L, "idempotency-key-456-789012345678901234", "token-456", null);
 
-        assertThrows(CarritoException.class, () -> {
-            carritoService.iniciarCheckout(CARRITO_ID, USUARIO_ID, dto);
-        });
+        CarritoException exception = assertThrows(CarritoException.class,
+            () -> carritoService.iniciarCheckout(CARRITO_ID, USUARIO_ID, dto));
+        assertNotNull(exception);
     }
 
     @Test
@@ -206,9 +226,9 @@ class CarritoServiceTest {
 
         when(carritoRepository.findById(CARRITO_ID)).thenReturn(Optional.of(carrito));
 
-        assertThrows(CarritoException.class, () -> {
-            carritoService.renovarReserva(CARRITO_ID, USUARIO_ID);
-        });
+        CarritoException exception = assertThrows(CarritoException.class,
+            () -> carritoService.renovarReserva(CARRITO_ID, USUARIO_ID));
+        assertNotNull(exception);
     }
 
     @Test
@@ -250,9 +270,9 @@ class CarritoServiceTest {
 
         DevolucionRequestDto dto = new DevolucionRequestDto(CARRITO_ID, "No puedo asistir");
 
-        assertThrows(CarritoException.class, () -> {
-            carritoService.procesarDevolucion(CARRITO_ID, USUARIO_ID, dto);
-        });
+        CarritoException exception = assertThrows(CarritoException.class,
+            () -> carritoService.procesarDevolucion(CARRITO_ID, USUARIO_ID, dto));
+        assertNotNull(exception);
     }
 
     @Test

@@ -25,7 +25,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.ticketti.ms_carrito.dto.*;
+import com.ticketti.ms_carrito.dto.AgregarEntradaDto;
+import com.ticketti.ms_carrito.dto.CheckoutDto;
+import com.ticketti.ms_carrito.dto.DevolucionRequestDto;
+import com.ticketti.ms_carrito.dto.DevolucionResponseDto;
 import com.ticketti.ms_carrito.exception.CarritoException;
 import com.ticketti.ms_carrito.handler.CarritoExceptionHandler;
 import com.ticketti.ms_carrito.model.CarritoDeCompras;
@@ -34,6 +37,7 @@ import com.ticketti.ms_carrito.model.EstadoPago;
 import com.ticketti.ms_carrito.service.CarritoService;
 
 @ExtendWith(MockitoExtension.class)
+@SuppressWarnings("unused")
 class CarritoControllerTest {
 
     private MockMvc mockMvc;
@@ -44,23 +48,24 @@ class CarritoControllerTest {
     @InjectMocks
     private CarritoController carritoController;
 
-    private ObjectMapper objectMapper = new ObjectMapper();
+        private final ObjectMapper objectMapper = new ObjectMapper();
 
     private CarritoDeCompras carritoMock;
     private static final Long USUARIO_ID = 1L;
-    private static final Long ROL_USUARIO_ID = 2L;
+    private static final String ROL_USUARIO = "CLIENTE";
     private static final Long CARRITO_ID = 1L;
 
-    @BeforeEach
+        @SuppressWarnings("unused")
+        @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(carritoController)
                 .setControllerAdvice(new CarritoExceptionHandler())
                 .build();
-        
+
         carritoMock = new CarritoDeCompras();
         carritoMock.setIdCarrito(CARRITO_ID);
         carritoMock.setUsuarioId(USUARIO_ID);
-        carritoMock.setRolUsuarioId(ROL_USUARIO_ID);
+        carritoMock.setRolUsuarioId(0L);
         carritoMock.setEstadoCarrito(EstadoCarrito.CREADO);
         carritoMock.setEstadoPago(EstadoPago.PENDIENTE);
         carritoMock.setSubtotal(BigDecimal.ZERO);
@@ -70,11 +75,11 @@ class CarritoControllerTest {
 
     @Test
     void crearCarrito_DebeRetornar201() throws Exception {
-        when(carritoService.crearCarrito(USUARIO_ID, ROL_USUARIO_ID)).thenReturn(carritoMock);
+        when(carritoService.crearCarrito(USUARIO_ID, ROL_USUARIO)).thenReturn(carritoMock);
 
         mockMvc.perform(post("/api/v1/Carrito/crear")
                 .header("X-Usuario-Id", USUARIO_ID)
-                .header("X-Rol-Usuario-Id", ROL_USUARIO_ID))
+                .header("X-Rol-Usuario-Id", ROL_USUARIO))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.exito").value(true))
                 .andExpect(jsonPath("$.data.idCarrito").value(CARRITO_ID));
@@ -117,7 +122,7 @@ class CarritoControllerTest {
     @Test
     void agregarEntrada_DebeRetornar400_CuandoLimiteExcedido() throws Exception {
         AgregarEntradaDto dto = new AgregarEntradaDto(1L, "General", 5, new BigDecimal("10000"));
-        when(carritoService.agregarEntrada(eq(CARRITO_ID), eq(USUARIO_ID), any(AgregarEntradaDto.class)))
+                when(carritoService.agregarEntrada(eq(CARRITO_ID), eq(USUARIO_ID), any(AgregarEntradaDto.class)))
                 .thenThrow(new CarritoException("Maximo 4 entradas por compra"));
 
         mockMvc.perform(post("/api/v1/Carrito/{id}/entradas", CARRITO_ID)
@@ -177,12 +182,12 @@ class CarritoControllerTest {
     @Test
     void eliminarEntrada_DebeRetornar404_CuandoDetalleNoExiste() throws Exception {
         Long detalleId = 999L;
-        when(carritoService.eliminarEntrada(eq(CARRITO_ID), eq(detalleId), eq(USUARIO_ID)))
-                .thenThrow(new CarritoException("Detalle no encontrado"));
+        when(carritoService.eliminarEntrada(CARRITO_ID, detalleId, USUARIO_ID))
+                .thenThrow(CarritoException.detalleNoEncontrado(detalleId));
 
         mockMvc.perform(delete("/api/v1/Carrito/{id}/entradas/{detalleId}", CARRITO_ID, detalleId)
                 .header("X-Usuario-Id", USUARIO_ID))
-                                .andExpect(status().isNotFound())
+                .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.exito").value(false));
     }
 
