@@ -23,4 +23,4 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{secrets.DOCKER_USERNAME}}/carrito-ms:latest
+          tags: ${{secrets.DOCKER_USERNAME}}/ms-carrito:latest
