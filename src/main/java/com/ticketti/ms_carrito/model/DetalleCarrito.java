@@ -38,7 +38,7 @@ public class DetalleCarrito {
     @Column(name = "EVENTO_ID", nullable = false)
     private Long eventoId;
 
-    @Column(name = "TIPO_ENTRADA_ID_TIPO", nullable = false)
+    @Column(name = "TIPO_ENTRADA_ID_TIPO")
     private Long tipoEntradaIdTipo;
 
     @Column(name = "TIPO_ENTRADA_NOMBRE", length = 50)
