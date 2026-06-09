@@ -7,7 +7,11 @@ services:
       MYSQL_DATABASE: carrito_db
     volumes:
       - mysql_data:/var/lib/mysql
-
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     networks:
       - ticketti-network
   app:
@@ -15,7 +19,10 @@ services:
     container_name: app
     restart: on-failure
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     ports:
       - "8082:8082"
     networks:
