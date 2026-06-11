@@ -7,7 +7,11 @@ services:
       MYSQL_DATABASE: carrito_db
     volumes:
       - mysql_data:/var/lib/mysql
-
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
     networks:
       - ticketti-network
   app:
@@ -15,7 +19,8 @@ services:
     container_name: app
     restart: on-failure
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
     ports:
       - "8082:8082"
     networks:
@@ -29,6 +34,8 @@ services:
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: guest
       SPRING_RABBITMQ_PASSWORD: guest
+      SPRING_CONFIG_IMPORT: optional:configserver:http://host.docker.internal:8888
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
 
 volumes:
   mysql_data:

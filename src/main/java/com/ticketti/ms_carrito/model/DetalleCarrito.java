@@ -2,6 +2,8 @@ package com.ticketti.ms_carrito.model;
 
 import java.math.BigDecimal;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -52,6 +54,7 @@ public class DetalleCarrito {
 
     @ManyToOne
     @JoinColumn(name = "ID_CARRITO_DE_COMPRAS", referencedColumnName = "ID_CARRITO", insertable = false, updatable = false)
+    @JsonIgnore
     private CarritoDeCompras carrito;
 
     public BigDecimal getSubtotal() {
