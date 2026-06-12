@@ -98,7 +98,11 @@ public class CarritoDeCompras {
         this.subtotal = detalles.stream()
                 .map(DetalleCarrito::getSubtotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        this.montoDonacion = this.subtotal.multiply(new BigDecimal("0.10"));
+        if (this.causaSocialId != null && this.causaSocialId == 0L) {
+            this.montoDonacion = BigDecimal.ZERO;
+        } else {
+            this.montoDonacion = this.subtotal.multiply(new BigDecimal("0.10"));
+        }
         this.total = this.subtotal.add(this.montoDonacion);
     }
 

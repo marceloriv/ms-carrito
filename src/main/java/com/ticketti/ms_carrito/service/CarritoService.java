@@ -278,6 +278,7 @@ public class CarritoService {
         reserva = reservaRepository.save(reserva);
 
         carrito.setCausaSocialId(dto.getCausaSocialId());
+        carrito.recalcularTotales();
         carrito.setReservaId(reserva.getIdReserva());
         carrito.setIdempotencyKey(idempotencyKey);
         carrito.setEstadoCarrito(EstadoCarrito.RESERVADO);
