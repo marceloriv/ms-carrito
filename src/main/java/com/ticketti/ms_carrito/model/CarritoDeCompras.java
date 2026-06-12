@@ -98,7 +98,9 @@ public class CarritoDeCompras {
         this.subtotal = detalles.stream()
                 .map(DetalleCarrito::getSubtotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+        // La donación del 10% es siempre obligatoria
         this.montoDonacion = this.subtotal.multiply(new BigDecimal("0.10"));
+        
         this.total = this.subtotal.add(this.montoDonacion);
     }
 
