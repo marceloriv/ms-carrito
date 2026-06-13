@@ -40,7 +40,7 @@ public class PagoWebhookService {
      * @param dto datos del webhook recibido.
      * @return carrito actualizado.
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional
     public CarritoDeCompras procesarPagoAprobado(CarritoDeCompras carrito, WebhookPagoDto dto) {
         carrito.setEstadoCarrito(EstadoCarrito.PAGADO);
         carrito.setEstadoPago(EstadoPago.PAGADO);
@@ -72,7 +72,7 @@ public class PagoWebhookService {
      * @param carrito carrito afectado por el rechazo.
      * @return carrito actualizado.
      */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional
     public CarritoDeCompras procesarPagoRechazado(CarritoDeCompras carrito) {
         carrito.setEstadoCarrito(EstadoCarrito.FALLIDO);
         carrito.setEstadoPago(EstadoPago.FALLIDO);

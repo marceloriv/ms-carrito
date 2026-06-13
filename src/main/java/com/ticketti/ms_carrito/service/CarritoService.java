@@ -194,7 +194,7 @@ public class CarritoService {
             Reserva reserva = reservaRepository.findById(carrito.getReservaId()).orElse(null);
             if (reserva != null) {
                 try {
-                    eventoClient.liberarReserva(reserva.getEventoId(), String.valueOf(reserva.getIdReserva()));
+                    eventoClient.liberarReserva(reserva.getEventoId(), reserva.getCantidadEntradas());
                     reserva.setEstadoReserva(Reserva.EstadoReserva.RESERVA_CANCELADA);
                     reservaRepository.save(reserva);
                 } catch (Exception e) {
@@ -249,14 +249,15 @@ public class CarritoService {
         Long eventoId = null;
         for (DetalleCarrito detalle : carrito.getDetalles()) {
             try {
-                String reservaIdStr = eventoClient.crearReserva(detalle.getEventoId(), reservaRequest);
-                reservaId = Long.valueOf(reservaIdStr);
+                eventoClient.crearReserva(detalle.getEventoId(), detalle.getCantidad());
+                reservaId = 0L;
                 eventoId = detalle.getEventoId();
                 detalle.setIdReserva(reservaId);
             } catch (RuntimeException e) {
+                log.error("==== ERROR EN FEIGN AL CREAR RESERVA ====", e);
                 if (reservaId != null) {
                     try {
-                        eventoClient.liberarReserva(detalle.getEventoId(), String.valueOf(reservaId));
+                        eventoClient.liberarReserva(detalle.getEventoId(), detalle.getCantidad());
                     } catch (RuntimeException ex) {
                         log.error("Error liberando reserva: {}", ex.getMessage());
                     }
@@ -278,6 +279,7 @@ public class CarritoService {
         reserva = reservaRepository.save(reserva);
 
         carrito.setCausaSocialId(dto.getCausaSocialId());
+        carrito.recalcularTotales();
         carrito.setReservaId(reserva.getIdReserva());
         carrito.setIdempotencyKey(idempotencyKey);
         carrito.setEstadoCarrito(EstadoCarrito.RESERVADO);
@@ -286,7 +288,24 @@ public class CarritoService {
 
         detalleRepository.saveAll(carrito.getDetalles());
 
-        return carritoRepository.save(carrito);
+        CarritoDeCompras carritoGuardado = carritoRepository.save(carrito);
+
+        // Procesar el pago automáticamente en la misma transacción (simulado para desarrollo)
+        try {
+            WebhookPagoDto pagoDto = new WebhookPagoDto();
+            pagoDto.setPedidoId(carritoId);
+            pagoDto.setEstado("aprobado");
+            pagoDto.setToken("simulado-checkout");
+            pagoDto.setTimestamp(LocalDateTime.now().toString());
+            pagoDto.setNonce(java.util.UUID.randomUUID().toString());
+
+            carritoGuardado = pagoWebhookService.procesarPagoAprobado(carritoGuardado, pagoDto);
+        } catch (Exception e) {
+            log.error("Error al procesar pago automático en checkout: {}", e.getMessage());
+            // No lanzamos error porque el checkout ya se completó exitosamente
+        }
+
+        return carritoGuardado;
     }
 
     /**
@@ -343,7 +362,7 @@ public class CarritoService {
                 Reserva reserva = reservaRepository.findById(carrito.getReservaId()).orElse(null);
                 if (reserva != null) {
                     try {
-                        eventoClient.liberarReserva(reserva.getEventoId(), String.valueOf(reserva.getIdReserva()));
+                        eventoClient.liberarReserva(reserva.getEventoId(), reserva.getCantidadEntradas());
                         reserva.setEstadoReserva(Reserva.EstadoReserva.RESERVA_CANCELADA);
                         reservaRepository.save(reserva);
                     } catch (Exception e) {
@@ -354,6 +373,43 @@ public class CarritoService {
 
             return pagoWebhookService.procesarPagoRechazado(carrito);
         }
+
+        return pagoWebhookService.procesarPagoAprobado(carrito, dto);
+    }
+
+    /**
+     * Procesa un pago manual (simulado) para desarrollo/pruebas sin pasarela de pagos.
+     * Este método es similar al webhook pero diseñado para ser llamado directamente por el frontend.
+     *
+     * @param carritoId ID del carrito a procesar.
+     * @param usuarioId ID del usuario que realiza el pago.
+     * @return Carrito actualizado a estado PAGADO.
+     */
+    @Transactional
+    public CarritoDeCompras procesarPagoManual(Long carritoId, Long usuarioId) {
+        log.info("Procesando pago manual para carrito {} - Usuario: {}", carritoId, usuarioId);
+
+        CarritoDeCompras carrito = carritoRepository.findById(carritoId)
+                .orElseThrow(() -> CarritoException.carritoNoEncontrado(carritoId));
+
+        validarPropiedadCarrito(carrito, usuarioId);
+
+        if (carrito.getEstadoCarrito() == EstadoCarrito.PAGADO) {
+            log.info("Carrito {} ya está en estado PAGADO", carritoId);
+            return carrito;
+        }
+
+        if (carrito.getEstadoCarrito() != EstadoCarrito.RESERVADO) {
+            throw CarritoException.transicionEstadoInvalida(carrito.getEstadoCarrito().toString(), "PAGADO");
+        }
+
+        // Crear un WebhookPagoDto simulado para reutilizar la lógica existente
+        WebhookPagoDto dto = new WebhookPagoDto();
+        dto.setPedidoId(carritoId);
+        dto.setEstado("aprobado");
+        dto.setToken("simulado-manual");
+        dto.setTimestamp(java.time.LocalDateTime.now().toString());
+        dto.setNonce(java.util.UUID.randomUUID().toString());
 
         return pagoWebhookService.procesarPagoAprobado(carrito, dto);
     }
@@ -381,7 +437,7 @@ public class CarritoService {
             Reserva reserva = reservaRepository.findById(carrito.getReservaId()).orElse(null);
             if (reserva != null) {
                 try {
-                    eventoClient.liberarReserva(reserva.getEventoId(), String.valueOf(reserva.getIdReserva()));
+                    eventoClient.liberarReserva(reserva.getEventoId(), reserva.getCantidadEntradas());
                     reserva.setEstadoReserva(Reserva.EstadoReserva.RESERVA_CANCELADA);
                     reservaRepository.save(reserva);
                 } catch (Exception e) {
