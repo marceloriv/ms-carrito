@@ -211,6 +211,22 @@ public class CarritoController {
         return ResponseEntity.ok(ApiRespuestaDto.exito("Pago procesado", carrito));
     }
 
+    @Operation(summary = "Procesar pago manual (simulado)", description = "Procesa un pago manual para desarrollo/pruebas sin pasarela de pagos")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Pago procesado exitosamente"),
+        @ApiResponse(responseCode = "400", description = "Estado invalido del carrito"),
+        @ApiResponse(responseCode = "404", description = "Carrito no encontrado")
+    })
+    @PostMapping("/pago-manual/{id}")
+    public ResponseEntity<ApiRespuestaDto<CarritoDeCompras>> procesarPagoManual(
+            @Parameter(description = "ID del carrito", required = true) @PathVariable Long id,
+            @Parameter(description = "ID del usuario", required = true)
+            @RequestHeader("X-Usuario-Id") Long usuarioId) {
+        log.info("POST /api/v1/Carrito/pago-manual/{} - Usuario: {}", id, usuarioId);
+        CarritoDeCompras carrito = carritoService.procesarPagoManual(id, usuarioId);
+        return ResponseEntity.ok(ApiRespuestaDto.exito("Pago manual procesado exitosamente", carrito));
+    }
+
     @Operation(summary = "Solicitar devolucion", description = "Procesa reembolso del 85% (10% donacion no reembolsable)")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Devolucion procesada exitosamente"),

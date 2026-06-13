@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
@@ -163,7 +164,7 @@ class CarritoServiceTest {
         reservaGuardada.setIdReserva(100L);
 
         when(carritoRepository.findById(CARRITO_ID)).thenReturn(Optional.of(carrito));
-        when(eventoClient.crearReserva(any(), any())).thenReturn("100");
+        doNothing().when(eventoClient).crearReserva(any(), any());
         when(idempotencyService.registrarSolicitud(eq("idempotency-key-test-32-chars-long-valid"), any()))
                 .thenReturn(new IdempotencyRecord());
         when(reservaRepository.save(any(Reserva.class))).thenReturn(reservaGuardada);
@@ -187,7 +188,7 @@ class CarritoServiceTest {
         carrito.getDetalles().add(detalle);
 
         when(carritoRepository.findById(CARRITO_ID)).thenReturn(Optional.of(carrito));
-        when(eventoClient.crearReserva(any(), any())).thenThrow(FeignException.class);
+        doThrow(FeignException.class).when(eventoClient).crearReserva(any(), any());
         when(idempotencyService.registrarSolicitud(eq("idempotency-key-456-789012345678901234"), any()))
                 .thenReturn(new IdempotencyRecord());
 

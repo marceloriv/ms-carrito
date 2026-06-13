@@ -56,7 +56,7 @@ public class IdempotencyService {
      * @param responseSnapshot respuesta guardada como referencia.
      * @return registro actualizado.
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public IdempotencyRecord marcarCompletado(String idempotencyKey, String responseSnapshot) {
         IdempotencyRecord registro = obtenerRegistro(idempotencyKey);
         registro.marcarCompletado(responseSnapshot);

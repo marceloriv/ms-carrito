@@ -120,6 +120,10 @@ public class SagaOrchestrator {
 			pedido.marcarPagado();
 			pedido = pedidoRepository.save(pedido);
 
+			carrito.setEstadoCarrito(EstadoCarrito.PAGADO);
+			carrito.setEstadoPago(EstadoPago.PAGADO);
+			carritoRepository.save(carrito);
+
 			guardarEventoOutbox(pedido, "pago.aprobado");
 			marcarIdempotenciaCompletada(dto.getIdempotencyKey(), pedido);
 
@@ -245,11 +249,8 @@ public class SagaOrchestrator {
 	private void reservarStock(Pedido pedido, CarritoDeCompras carrito) {
 		pedido.getItems().forEach(item -> {
 			try {
-				ReservaRequestDto reservaRequest = new ReservaRequestDto();
-				reservaRequest.setCantidadEntradas(item.getCantidad());
-				reservaRequest.setIdUsuario(pedido.getUserId());
-
-				Long idReserva = Long.valueOf(eventoClient.crearReserva(item.getEventoId(), reservaRequest));
+				eventoClient.crearReserva(item.getEventoId(), item.getCantidad());
+				Long idReserva = 0L;
 				item.setReservaId(idReserva);
 				if (pedido.getReservaId() == null) {
 					pedido.setReservaId(idReserva);
@@ -323,7 +324,7 @@ public class SagaOrchestrator {
 		pedido.getItems().forEach(item -> {
 			if (item.getReservaId() != null) {
 				try {
-					eventoClient.liberarReserva(item.getEventoId(), String.valueOf(item.getReservaId()));
+					eventoClient.liberarReserva(item.getEventoId(), item.getCantidad());
 					reservaRepository.findById(item.getReservaId()).ifPresent(reserva -> {
 						reserva.setEstadoReserva(Reserva.EstadoReserva.RESERVA_CANCELADA);
 						reservaRepository.save(reserva);
