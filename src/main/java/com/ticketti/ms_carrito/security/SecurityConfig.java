@@ -35,7 +35,7 @@ public class SecurityConfig {
 						.requestMatchers("/webjars/**", "/swagger-resources/**").permitAll()
 						.requestMatchers("/actuator/health", "/actuator/info", "/actuator").permitAll()
 						.requestMatchers("/api/v1/webhooks/**").permitAll()
-						.requestMatchers("/api/v1/Carrito/**").permitAll()
+						.requestMatchers("/api/v1/Carrito/**").authenticated()
 						.requestMatchers("/api/v1/checkout/**").authenticated()
 						.requestMatchers("/api/v1/devoluciones/**").authenticated()
 						.anyRequest().authenticated())
