@@ -3,7 +3,6 @@ package com.ticketti.ms_carrito.service;
 import java.time.LocalDateTime;
 
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -32,9 +31,11 @@ public class PagoWebhookService {
     private final OutboxEventRepository outboxRepository;
     private final IdempotencyService idempotencyService;
     private final ObjectMapper objectMapper;
+    private final CarritoService carritoService;
 
     /**
      * Procesa un pago aprobado y deja persistidos el carrito, el pago y el outbox.
+     * También crea un nuevo carrito vacío para el usuario para futuras compras.
      *
      * @param carrito carrito que será marcado como pagado.
      * @param dto datos del webhook recibido.
@@ -61,6 +62,18 @@ public class PagoWebhookService {
         if (carrito.getIdempotencyKey() != null) {
             idempotencyService.marcarCompletado(carrito.getIdempotencyKey(),
                     "{\"carritoId\": " + carrito.getIdCarrito() + ", \"estado\": \"PAGADO\"}");
+        }
+
+        // Crear un nuevo carrito vacío para el usuario para futuras compras
+        try {
+            String rolUsuario = carrito.getRolUsuario() != null ? carrito.getRolUsuario().toString() : "CLIENTE";
+            CarritoDeCompras nuevoCarrito = carritoService.crearCarrito(carrito.getUsuarioId(), rolUsuario);
+            log.info("Nuevo carrito vacío creado con ID {} para usuario {} después de pago exitoso",
+                    nuevoCarrito.getIdCarrito(), carrito.getUsuarioId());
+        } catch (Exception e) {
+            log.error("Error creando nuevo carrito para usuario {} después de pago: {}",
+                    carrito.getUsuarioId(), e.getMessage());
+            // No lanzamos excepción para no interrumpir el flujo de pago
         }
 
         return carrito;
