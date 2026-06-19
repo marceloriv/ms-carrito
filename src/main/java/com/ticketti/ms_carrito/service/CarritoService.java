@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,11 +45,9 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class CarritoService {
 
@@ -69,6 +68,30 @@ public class CarritoService {
     private final UsuarioClient usuarioClient;
     private final CausaSocialClient causaSocialClient;
     private final ObjectMapper objectMapper;
+
+    public CarritoService(CarritoRepository carritoRepository,
+                         DetalleCarritoRepository detalleRepository,
+                         ReservaRepository reservaRepository,
+                         PagoRepository pagoRepository,
+                         OutboxEventRepository outboxRepository,
+                         EventoClient eventoClient,
+                         IdempotencyService idempotencyService,
+                         @Lazy PagoWebhookService pagoWebhookService,
+                         UsuarioClient usuarioClient,
+                         CausaSocialClient causaSocialClient,
+                         ObjectMapper objectMapper) {
+        this.carritoRepository = carritoRepository;
+        this.detalleRepository = detalleRepository;
+        this.reservaRepository = reservaRepository;
+        this.pagoRepository = pagoRepository;
+        this.outboxRepository = outboxRepository;
+        this.eventoClient = eventoClient;
+        this.idempotencyService = idempotencyService;
+        this.pagoWebhookService = pagoWebhookService;
+        this.usuarioClient = usuarioClient;
+        this.causaSocialClient = causaSocialClient;
+        this.objectMapper = objectMapper;
+    }
 
     private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
