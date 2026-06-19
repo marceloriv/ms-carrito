@@ -34,6 +34,7 @@ services:
       SPRING_RABBITMQ_PORT: 5672
       SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER}
       SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASS}
+      JWT_SECRET: ${JWT_SECRET}
       SPRING_CONFIG_IMPORT: optional:configserver:http://host.docker.internal:8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
 

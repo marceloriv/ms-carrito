@@ -66,7 +66,7 @@ public class PagoWebhookService {
 
         // Crear un nuevo carrito vacío para el usuario para futuras compras
         try {
-            String rolUsuario = carrito.getRolUsuario() != null ? carrito.getRolUsuario().toString() : "CLIENTE";
+            String rolUsuario = "CLIENTE"; // El rol del usuario no está en el carrito, se usa valor por defecto
             CarritoDeCompras nuevoCarrito = carritoService.crearCarrito(carrito.getUsuarioId(), rolUsuario);
             log.info("Nuevo carrito vacío creado con ID {} para usuario {} después de pago exitoso",
                     nuevoCarrito.getIdCarrito(), carrito.getUsuarioId());
