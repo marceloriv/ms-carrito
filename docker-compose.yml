@@ -18,7 +18,7 @@ services:
       - ticketti-network
   app:
     build: .
-    container_name: app
+    container_name: ms-carrito-app
     restart: on-failure
     depends_on:
       mysql:
