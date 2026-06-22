@@ -28,7 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class JwtService {
 
-	@Value("${jwt.secret:clave-secreta-super-larga-de-minimo-32-caracteres}")
+	@Value("${jwt.secret}")
 	private String secretKey;
 
 	private SecretKey getSigningKey() {

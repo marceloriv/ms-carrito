@@ -35,7 +35,7 @@ public class SecurityConfig {
 						.requestMatchers("/v3/api-docs/**", "/v3/api-docs", "/api-docs/**").permitAll()
 						.requestMatchers("/webjars/**", "/swagger-resources/**").permitAll()
 						.requestMatchers("/actuator/health", "/actuator/info", "/actuator").permitAll()
-						.requestMatchers("/api/v1/webhooks/**").permitAll()
+						.requestMatchers("/api/v1/webhooks/**").authenticated()
 						.requestMatchers(HttpMethod.POST, "/api/v1/Carrito/crear").permitAll()
 						.requestMatchers(HttpMethod.POST, "/api/v1/carrito/crear").permitAll()
 						.requestMatchers("/api/v1/Carrito/**").authenticated()

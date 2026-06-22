@@ -542,6 +542,9 @@ public class CarritoService {
      * Verifica que el carrito pertenezca al usuario indicado.
      */
     private void validarPropiedadCarrito(CarritoDeCompras carrito, Long usuarioId) {
+        if (carrito.getUsuarioId() == null) {
+            throw CarritoException.carritoNoEncontrado(carrito.getIdCarrito());
+        }
         if (!carrito.getUsuarioId().equals(usuarioId)) {
             throw CarritoException.accesoNoAutorizado();
         }
