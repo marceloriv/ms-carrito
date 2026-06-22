@@ -56,10 +56,10 @@ public class CarritoController {
     })
     @PostMapping("/crear")
     public ResponseEntity<ApiRespuestaDto<CarritoDeCompras>> crearCarrito(
-            @Parameter(description = "ID del usuario", required = true)
-            @RequestHeader("X-Usuario-Id") Long usuarioId,
-            @Parameter(description = "Rol del usuario", required = true)
-            @RequestHeader("X-Rol-Usuario-Id") String rolUsuario) {
+            @Parameter(description = "ID del usuario (null para invitados)")
+            @RequestHeader(value = "X-Usuario-Id", required = false) Long usuarioId,
+            @Parameter(description = "Rol del usuario (null para invitados)")
+            @RequestHeader(value = "X-Rol-Usuario-Id", required = false) String rolUsuario) {
         log.info("POST /api/v1/Carrito/crear - Usuario: {}, Rol: {}", usuarioId, rolUsuario);
         CarritoDeCompras carrito = carritoService.crearCarrito(usuarioId, rolUsuario);
         return ResponseEntity.status(HttpStatus.CREATED)
