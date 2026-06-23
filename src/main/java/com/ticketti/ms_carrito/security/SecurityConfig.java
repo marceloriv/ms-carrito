@@ -2,6 +2,7 @@ package com.ticketti.ms_carrito.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -34,8 +35,10 @@ public class SecurityConfig {
 						.requestMatchers("/v3/api-docs/**", "/v3/api-docs", "/api-docs/**").permitAll()
 						.requestMatchers("/webjars/**", "/swagger-resources/**").permitAll()
 						.requestMatchers("/actuator/health", "/actuator/info", "/actuator").permitAll()
-						.requestMatchers("/api/v1/webhooks/**").permitAll()
-						.requestMatchers("/api/v1/Carrito/**").permitAll()
+						.requestMatchers("/api/v1/webhooks/**").authenticated()
+						.requestMatchers(HttpMethod.POST, "/api/v1/Carrito/crear").permitAll()
+						.requestMatchers(HttpMethod.POST, "/api/v1/carrito/crear").permitAll()
+						.requestMatchers("/api/v1/Carrito/**").authenticated()
 						.requestMatchers("/api/v1/checkout/**").authenticated()
 						.requestMatchers("/api/v1/devoluciones/**").authenticated()
 						.anyRequest().authenticated())
