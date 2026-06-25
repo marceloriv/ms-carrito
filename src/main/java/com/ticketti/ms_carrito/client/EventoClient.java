@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import com.ticketti.ms_carrito.client.dto.EventoInfoDto;
 import com.ticketti.ms_carrito.dto.ReservaRequestDto;
 
-@FeignClient(name = "ms-eventos")
+@FeignClient(name = "ms-eventos", url = "${ms-eventos.url:http://localhost:8083}")
 public interface EventoClient {
 
     @GetMapping("/api/v0/Eventos/buscarEvento/{eventoId}")

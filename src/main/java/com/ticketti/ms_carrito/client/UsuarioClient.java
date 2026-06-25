@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 
 import com.ticketti.ms_carrito.client.dto.UsuarioInfoDto;
 
-@FeignClient(name = "ms-usuarios", url = "${ms-usuarios.url:http://localhost:8082}")
+@FeignClient(name = "ms-usuarios", url = "${ms-usuarios.url:http://localhost:8080}")
 public interface UsuarioClient {
 
     @GetMapping("/api/v1/usuarios/{usuarioId}")

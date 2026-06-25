@@ -30,7 +30,8 @@ public class CarritoException extends RuntimeException {
         PAGO_FALLIDO,
         HMAC_INVALIDO,
         TIMESTAMP_INVALIDO,
-        NONCE_REPETIDO
+        NONCE_REPETIDO,
+        SERVICIO_NO_DISPONIBLE
     }
 
     private final CodigoError codigo;
@@ -125,5 +126,10 @@ public class CarritoException extends RuntimeException {
 
     public static CarritoException nonceRepetido() {
         return new CarritoException(CodigoError.NONCE_REPETIDO, "Nonce ya fue utilizado anteriormente");
+    }
+
+    public static CarritoException servicioNoDisponible(String servicio) {
+        return new CarritoException(CodigoError.SERVICIO_NO_DISPONIBLE,
+                "El servicio " + servicio + " no está disponible. Intente nuevamente.");
     }
 }

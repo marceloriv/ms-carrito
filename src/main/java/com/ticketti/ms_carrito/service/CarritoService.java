@@ -268,25 +268,32 @@ public class CarritoService {
         reservaRequest.setCantidadEntradas(totalEntradas);
         reservaRequest.setIdUsuario(usuarioId);
 
-        Long reservaId = null;
         Long eventoId = null;
+        List<DetalleCarrito> reservasExitosas = new ArrayList<>();
+
         for (DetalleCarrito detalle : carrito.getDetalles()) {
             try {
                 eventoClient.crearReserva(detalle.getEventoId(), detalle.getCantidad());
-                reservaId = 0L;
+                detalle.setIdReserva(0L);
+                reservasExitosas.add(detalle);
                 eventoId = detalle.getEventoId();
-                detalle.setIdReserva(reservaId);
             } catch (RuntimeException e) {
-                log.error("==== ERROR EN FEIGN AL CREAR RESERVA ====", e);
-                if (reservaId != null) {
+                log.error("Error al crear reserva para evento {}: {}", detalle.getEventoId(), e.getMessage());
+
+                for (DetalleCarrito reservaExitosa : reservasExitosas) {
                     try {
-                        eventoClient.liberarReserva(detalle.getEventoId(), detalle.getCantidad());
+                        eventoClient.liberarReserva(reservaExitosa.getEventoId(), reservaExitosa.getCantidad());
                     } catch (RuntimeException ex) {
-                        log.error("Error liberando reserva: {}", ex.getMessage());
+                        log.error("Error liberando reserva del evento {}: {}", reservaExitosa.getEventoId(), ex.getMessage());
                     }
                 }
+
                 idempotencyService.marcarFallido(idempotencyKey);
-                throw CarritoException.stockNoDisponible(detalle.getEventoId());
+
+                if (e.getMessage() != null && e.getMessage().contains("Stock insuficiente")) {
+                    throw CarritoException.stockNoDisponible(detalle.getEventoId());
+                }
+                throw CarritoException.servicioNoDisponible("ms-eventos");
             }
         }
 

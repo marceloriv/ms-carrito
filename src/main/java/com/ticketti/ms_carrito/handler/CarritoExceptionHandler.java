@@ -37,6 +37,7 @@ public class CarritoExceptionHandler {
             case PAGO_NO_APROBADO -> HttpStatus.PAYMENT_REQUIRED;
             case DEVOLUCION_NO_PERMITIDA -> HttpStatus.FORBIDDEN;
             case WEBHOOK_INVALIDO, HMAC_INVALIDO, TIMESTAMP_INVALIDO, NONCE_REPETIDO -> HttpStatus.UNAUTHORIZED;
+            case SERVICIO_NO_DISPONIBLE -> HttpStatus.SERVICE_UNAVAILABLE;
             default -> HttpStatus.BAD_REQUEST;
         };
 
