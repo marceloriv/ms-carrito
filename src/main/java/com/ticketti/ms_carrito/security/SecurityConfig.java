@@ -35,12 +35,27 @@ public class SecurityConfig {
 						.requestMatchers("/v3/api-docs/**", "/v3/api-docs", "/api-docs/**").permitAll()
 						.requestMatchers("/webjars/**", "/swagger-resources/**").permitAll()
 						.requestMatchers("/actuator/health", "/actuator/info", "/actuator").permitAll()
-						.requestMatchers("/api/v1/webhooks/**").authenticated()
+
+						// === Rutas que requieren autenticación ===
+						.requestMatchers(HttpMethod.POST, "/api/v1/Carrito/webhooks/**").authenticated()
+						.requestMatchers(HttpMethod.POST, "/api/v1/Carrito/checkout/**").authenticated()
+						.requestMatchers(HttpMethod.POST, "/api/v1/Carrito/renovar/**").authenticated()
+						.requestMatchers(HttpMethod.POST, "/api/v1/Carrito/pago-manual/**").authenticated()
+						.requestMatchers(HttpMethod.POST, "/api/v1/Carrito/devoluciones/**").authenticated()
+						.requestMatchers(HttpMethod.GET, "/api/v1/Carrito/listar").authenticated()
+						.requestMatchers(HttpMethod.POST, "/api/v1/Carrito/estadisticas").authenticated()
+
+						// === Rutas públicas (guest puede operar con cartId) ===
 						.requestMatchers(HttpMethod.POST, "/api/v1/Carrito/crear").permitAll()
-						.requestMatchers(HttpMethod.POST, "/api/v1/carrito/crear").permitAll()
+						.requestMatchers(HttpMethod.GET, "/api/v1/Carrito/obtener/**").permitAll()
+						.requestMatchers(HttpMethod.GET, "/api/v1/Carrito/resumen/**").permitAll()
+						.requestMatchers(HttpMethod.POST, "/api/v1/Carrito/*/entradas").permitAll()
+						.requestMatchers(HttpMethod.DELETE, "/api/v1/Carrito/*/entradas/**").permitAll()
+						.requestMatchers(HttpMethod.PUT, "/api/v1/Carrito/actualizar/**").permitAll()
+						.requestMatchers(HttpMethod.DELETE, "/api/v1/Carrito/vaciar").permitAll()
+
+						// Catch-all: cualquier otra ruta de carrito requiere auth
 						.requestMatchers("/api/v1/Carrito/**").authenticated()
-						.requestMatchers("/api/v1/checkout/**").authenticated()
-						.requestMatchers("/api/v1/devoluciones/**").authenticated()
 						.anyRequest().authenticated())
 				.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 

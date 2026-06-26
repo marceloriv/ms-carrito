@@ -9,6 +9,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ticketti.ms_carrito.dto.WebhookPagoDto;
 import com.ticketti.ms_carrito.exception.CarritoException;
+import com.ticketti.ms_carrito.messaging.CompraConfirmadaEvent;
 import com.ticketti.ms_carrito.model.CarritoDeCompras;
 import com.ticketti.ms_carrito.model.EstadoCarrito;
 import com.ticketti.ms_carrito.model.EstadoPago;
@@ -107,7 +108,18 @@ public class PagoWebhookService {
      */
     private void guardarEventoOutbox(CarritoDeCompras carrito, String tipo) {
         try {
-            String payload = objectMapper.writeValueAsString(carrito);
+            CompraConfirmadaEvent evt = new CompraConfirmadaEvent();
+            evt.setIdCarrito(carrito.getIdCarrito());
+            evt.setPagoId(carrito.getIdPago());
+            evt.setUsuarioId(carrito.getUsuarioId());
+            evt.setCausaSocialId(carrito.getCausaSocialId());
+            evt.setTotal(carrito.getTotal());
+            evt.setMontoDonacion(carrito.getMontoDonacion());
+            if (carrito.getDetalles() != null && !carrito.getDetalles().isEmpty()) {
+                evt.setEventoId(carrito.getDetalles().get(0).getEventoId().longValue());
+            }
+
+            String payload = objectMapper.writeValueAsString(evt);
 
             OutboxEvent event = new OutboxEvent();
             event.setAggregateId(carrito.getIdCarrito());
@@ -120,7 +132,7 @@ public class PagoWebhookService {
             outboxRepository.save(event);
             log.info("Outbox event guardado: {} para carrito {}", tipo, carrito.getIdCarrito());
         } catch (JsonProcessingException e) {
-            log.error("Error serializando carrito para outbox: {}", e.getMessage());
+            log.error("Error serializando evento para outbox: {}", e.getMessage());
             throw new CarritoException("Error procesando evento");
         }
     }

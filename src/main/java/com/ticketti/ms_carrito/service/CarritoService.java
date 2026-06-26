@@ -3,6 +3,7 @@ package com.ticketti.ms_carrito.service;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -23,6 +24,7 @@ import com.ticketti.ms_carrito.dto.AgregarEntradaDto;
 import com.ticketti.ms_carrito.dto.CheckoutDto;
 import com.ticketti.ms_carrito.dto.DevolucionRequestDto;
 import com.ticketti.ms_carrito.dto.DevolucionResponseDto;
+import com.ticketti.ms_carrito.dto.EstadisticaEventoDto;
 import com.ticketti.ms_carrito.dto.ReservaRequestDto;
 import com.ticketti.ms_carrito.dto.ResumenCarritoDto;
 import com.ticketti.ms_carrito.dto.WebhookPagoDto;
@@ -547,12 +549,14 @@ public class CarritoService {
 
     /**
      * Verifica que el carrito pertenezca al usuario indicado.
+     * Para carritos invitados (usuarioId == null), permite acceso sin validación.
+     * Para carritos de usuarios autenticados, exige coincidencia con X-Usuario-Id.
      */
     private void validarPropiedadCarrito(CarritoDeCompras carrito, Long usuarioId) {
         if (carrito.getUsuarioId() == null) {
-            throw CarritoException.carritoNoEncontrado(carrito.getIdCarrito());
+            return; // carrito invitado: acceso por cartId
         }
-        if (!carrito.getUsuarioId().equals(usuarioId)) {
+        if (usuarioId == null || !carrito.getUsuarioId().equals(usuarioId)) {
             throw CarritoException.accesoNoAutorizado();
         }
     }
@@ -667,5 +671,12 @@ public class CarritoService {
         }
 
         return evt;
+    }
+
+    public List<EstadisticaEventoDto> obtenerEstadisticasPorEventos(List<Long> eventoIds) {
+        if (eventoIds == null || eventoIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return detalleRepository.estadisticasPorEventos(eventoIds);
     }
 }
