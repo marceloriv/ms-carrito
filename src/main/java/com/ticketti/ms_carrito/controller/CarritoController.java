@@ -22,6 +22,8 @@ import com.ticketti.ms_carrito.dto.ApiRespuestaDto;
 import com.ticketti.ms_carrito.dto.CheckoutDto;
 import com.ticketti.ms_carrito.dto.DevolucionRequestDto;
 import com.ticketti.ms_carrito.dto.DevolucionResponseDto;
+import com.ticketti.ms_carrito.dto.EstadisticaEventoDto;
+import com.ticketti.ms_carrito.dto.EstadisticasRequestDto;
 import com.ticketti.ms_carrito.dto.ResumenCarritoDto;
 import com.ticketti.ms_carrito.dto.WebhookPagoDto;
 import com.ticketti.ms_carrito.model.CarritoDeCompras;
@@ -74,8 +76,8 @@ public class CarritoController {
     @GetMapping("/obtener/{id}")
     public ResponseEntity<ApiRespuestaDto<CarritoDeCompras>> obtenerCarrito(
             @Parameter(description = "ID del carrito", required = true) @PathVariable Long id,
-            @Parameter(description = "ID del usuario", required = true)
-            @RequestHeader("X-Usuario-Id") Long usuarioId) {
+            @Parameter(description = "ID del usuario (null para invitados)")
+            @RequestHeader(value = "X-Usuario-Id", required = false) Long usuarioId) {
         log.info("GET /api/v1/Carrito/obtener/{} - Usuario: {}", id, usuarioId);
         CarritoDeCompras carrito = carritoService.obtenerCarrito(id, usuarioId);
         return ResponseEntity.ok(ApiRespuestaDto.exito("Carrito obtenido", carrito));
@@ -107,8 +109,8 @@ public class CarritoController {
     @GetMapping("/resumen/{id}")
     public ResponseEntity<ApiRespuestaDto<ResumenCarritoDto>> obtenerResumen(
             @Parameter(description = "ID del carrito", required = true) @PathVariable Long id,
-            @Parameter(description = "ID del usuario", required = true)
-            @RequestHeader("X-Usuario-Id") Long usuarioId) {
+            @Parameter(description = "ID del usuario (null para invitados)")
+            @RequestHeader(value = "X-Usuario-Id", required = false) Long usuarioId) {
         log.info("GET /api/v1/Carrito/resumen/{} - Usuario: {}", id, usuarioId);
         ResumenCarritoDto resumen = carritoService.obtenerResumen(id, usuarioId);
         return ResponseEntity.ok(ApiRespuestaDto.exito("Resumen obtenido", resumen));
@@ -123,8 +125,8 @@ public class CarritoController {
     @PostMapping("/{id}/entradas")
     public ResponseEntity<ApiRespuestaDto<CarritoDeCompras>> agregarEntrada(
             @Parameter(description = "ID del carrito", required = true) @PathVariable Long id,
-            @Parameter(description = "ID del usuario", required = true)
-            @RequestHeader("X-Usuario-Id") Long usuarioId,
+            @Parameter(description = "ID del usuario (null para invitados)")
+            @RequestHeader(value = "X-Usuario-Id", required = false) Long usuarioId,
             @Valid @RequestBody AgregarEntradaDto dto) {
         log.info("POST /api/v1/Carrito/{}/entradas - Usuario: {}", id, usuarioId);
         CarritoDeCompras carrito = carritoService.agregarEntrada(id, usuarioId, dto);
@@ -140,8 +142,8 @@ public class CarritoController {
     public ResponseEntity<ApiRespuestaDto<CarritoDeCompras>> eliminarEntrada(
             @Parameter(description = "ID del carrito", required = true) @PathVariable Long id,
             @Parameter(description = "ID del detalle", required = true) @PathVariable Long detalleId,
-            @Parameter(description = "ID del usuario", required = true)
-            @RequestHeader("X-Usuario-Id") Long usuarioId) {
+            @Parameter(description = "ID del usuario (null para invitados)")
+            @RequestHeader(value = "X-Usuario-Id", required = false) Long usuarioId) {
         log.info("DELETE /api/v1/Carrito/{}/entradas/{} - Usuario: {}", id, detalleId, usuarioId);
         CarritoDeCompras carrito = carritoService.eliminarEntrada(id, detalleId, usuarioId);
         return ResponseEntity.ok(ApiRespuestaDto.exito("Entrada eliminada", carrito));
@@ -156,8 +158,8 @@ public class CarritoController {
     @PutMapping("/actualizar/{id}")
     public ResponseEntity<ApiRespuestaDto<CarritoDeCompras>> actualizarCarrito(
             @Parameter(description = "ID del carrito", required = true) @PathVariable Long id,
-            @Parameter(description = "ID del usuario", required = true)
-            @RequestHeader("X-Usuario-Id") Long usuarioId,
+            @Parameter(description = "ID del usuario (null para invitados)")
+            @RequestHeader(value = "X-Usuario-Id", required = false) Long usuarioId,
             @Valid @RequestBody AgregarEntradaDto dto) {
         log.info("PUT /api/v1/Carrito/actualizar/{} - Usuario: {}", id, usuarioId);
         CarritoDeCompras carrito = carritoService.agregarEntrada(id, usuarioId, dto);
@@ -253,11 +255,24 @@ public class CarritoController {
     public ResponseEntity<ApiRespuestaDto<Map<String, String>>> vaciarCarrito(
             @Parameter(description = "ID del carrito", required = true)
             @RequestHeader("X-Carrito-Id") Long carritoId,
-            @Parameter(description = "ID del usuario", required = true)
-            @RequestHeader("X-Usuario-Id") Long usuarioId) {
+            @Parameter(description = "ID del usuario (null para invitados)")
+            @RequestHeader(value = "X-Usuario-Id", required = false) Long usuarioId) {
         log.info("DELETE /api/v1/Carrito/vaciar - Carrito: {}, Usuario: {}", carritoId, usuarioId);
         carritoService.vaciarCarrito(carritoId, usuarioId);
         return ResponseEntity.ok(ApiRespuestaDto.exito("Carrito vaciado exitosamente",
                 Map.of("carritoId", carritoId.toString(), "estado", "CANCELADO")));
+    }
+
+    @Operation(summary = "Obtener estadisticas de ventas por eventos", description = "Retorna entradas vendidas e ingresos por cada evento solicitado")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Estadisticas obtenidas exitosamente"),
+        @ApiResponse(responseCode = "400", description = "Lista de eventos vacia")
+    })
+    @PostMapping("/estadisticas")
+    public ResponseEntity<ApiRespuestaDto<List<EstadisticaEventoDto>>> obtenerEstadisticas(
+            @Valid @RequestBody EstadisticasRequestDto request) {
+        log.info("POST /api/v1/Carrito/estadisticas - Eventos: {}", request.getEventoIds());
+        List<EstadisticaEventoDto> stats = carritoService.obtenerEstadisticasPorEventos(request.getEventoIds());
+        return ResponseEntity.ok(ApiRespuestaDto.exito("Estadisticas obtenidas", stats));
     }
 }

@@ -8,10 +8,13 @@ import java.util.concurrent.CompletableFuture;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ticketti.ms_carrito.client.EventoClient;
 import com.ticketti.ms_carrito.dto.CheckoutDto;
 import com.ticketti.ms_carrito.dto.ReservaRequestDto;
 import com.ticketti.ms_carrito.exception.CarritoException;
+import com.ticketti.ms_carrito.messaging.CompraConfirmadaEvent;
 import com.ticketti.ms_carrito.model.CarritoDeCompras;
 import com.ticketti.ms_carrito.model.EstadoCarrito;
 import com.ticketti.ms_carrito.model.EstadoPago;
@@ -52,6 +55,7 @@ public class SagaOrchestrator {
 	private final IdempotencyService idempotencyService;
 	private final OutboxEventRepository outboxRepository;
 	private final EventoClient eventoClient;
+	private final ObjectMapper objectMapper;
 
 	private final Validator validator = Validation.buildDefaultValidatorFactory().getValidator();
 
@@ -116,7 +120,7 @@ public class SagaOrchestrator {
 			pedido.reservar();
 			pedido = pedidoRepository.save(pedido);
 
-			procesarPago(pedido, dto);
+			Long pagoId = procesarPago(pedido, dto);
 			pedido.marcarPagado();
 			pedido = pedidoRepository.save(pedido);
 
@@ -124,7 +128,7 @@ public class SagaOrchestrator {
 			carrito.setEstadoPago(EstadoPago.PAGADO);
 			carritoRepository.save(carrito);
 
-			guardarEventoOutbox(pedido, "pago.aprobado");
+			guardarEventoOutbox(pedido, pagoId, "pago.aprobado");
 			marcarIdempotenciaCompletada(dto.getIdempotencyKey(), pedido);
 
 			log.info("[SAGA] Checkout completado exitosamente para pedido: {}", pedido.getId());
@@ -279,8 +283,9 @@ public class SagaOrchestrator {
 	 *
 	 * @param pedido pedido asociado al pago.
 	 * @param dto datos del checkout.
+	 * @return id del pago registrado.
 	 */
-	private void procesarPago(Pedido pedido, CheckoutDto dto) {
+	private Long procesarPago(Pedido pedido, CheckoutDto dto) {
 		log.info("[SAGA] Procesando pago para pedido: {}", pedido.getId());
 
 		Pago pago = new Pago();
@@ -291,26 +296,44 @@ public class SagaOrchestrator {
 		pago.setReservaIdReserva(pedido.getReservaId());
 		pago.setCarritoIdCarrito(pedido.getId());
 		pago.setFechaPago(LocalDateTime.now());
-		pagoRepository.save(pago);
+		pago = pagoRepository.save(pago);
+		return pago.getIdPago();
 	}
 
 	/**
 	 * Guarda en outbox el evento que notifica el pago confirmado.
 	 *
 	 * @param pedido pedido procesado.
+	 * @param pagoId id del pago registrado.
 	 * @param routingKey clave de enrutamiento.
 	 */
-	private void guardarEventoOutbox(Pedido pedido, String routingKey) {
-		OutboxEvent event = new OutboxEvent();
-		event.setAggregateId(pedido.getId());
-		event.setType("PAGO_CONFIRMADO");
-		event.setPayload(String.format(
-				"{\"pedidoId\": %d, \"userId\": %d, \"monto\": %s, \"estado\": \"%s\"}",
-				pedido.getId(), pedido.getUserId(), pedido.getTotal(), pedido.getEstadoPago()));
-		event.setRoutingKey(routingKey);
-		event.setStatus(OutboxEvent.Status.PENDING);
-		event.setCreatedAt(LocalDateTime.now());
-		outboxRepository.save(event);
+	private void guardarEventoOutbox(Pedido pedido, Long pagoId, String routingKey) {
+		try {
+			CompraConfirmadaEvent evt = new CompraConfirmadaEvent();
+			evt.setIdCarrito(pedido.getId());
+			evt.setPagoId(pagoId);
+			evt.setUsuarioId(pedido.getUserId());
+			evt.setCausaSocialId(pedido.getCausaSocialId());
+			evt.setTotal(pedido.getTotal());
+			evt.setMontoDonacion(pedido.getMontoDonacion());
+			if (pedido.getItems() != null && !pedido.getItems().isEmpty()) {
+				evt.setEventoId(pedido.getItems().get(0).getEventoId());
+			}
+
+			String payload = objectMapper.writeValueAsString(evt);
+
+			OutboxEvent event = new OutboxEvent();
+			event.setAggregateId(pedido.getId());
+			event.setType("PAGO_CONFIRMADO");
+			event.setPayload(payload);
+			event.setRoutingKey(routingKey);
+			event.setStatus(OutboxEvent.Status.PENDING);
+			event.setCreatedAt(LocalDateTime.now());
+			outboxRepository.save(event);
+		} catch (JsonProcessingException e) {
+			log.error("Error serializando evento para outbox: {}", e.getMessage());
+			throw new CarritoException("Error procesando evento");
+		}
 	}
 
 	/**
