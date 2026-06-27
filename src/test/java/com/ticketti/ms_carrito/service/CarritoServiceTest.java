@@ -200,6 +200,89 @@ class CarritoServiceTest {
     }
 
     @Test
+    void iniciarCheckout_DebeRetornarCarritoExistente_CuandoClaveDeIdempotenciaEstaCompleted() {
+        DetalleCarrito detalle = new DetalleCarrito();
+        detalle.setEventoId(EVENTO_ID);
+        detalle.setCantidad(2);
+        detalle.setIdCarritoDeCompras(CARRITO_ID);
+        carrito.getDetalles().add(detalle);
+        carrito.setEstadoCarrito(EstadoCarrito.RESERVADO);
+        carrito.setIdempotencyKey("idempotency-key-test-completed-32-chars");
+
+        IdempotencyRecord record = new IdempotencyRecord();
+        record.setKey("idempotency-key-test-completed-32-chars");
+        record.setStatus(IdempotencyRecord.Status.COMPLETED);
+
+        when(carritoRepository.findById(CARRITO_ID)).thenReturn(Optional.of(carrito));
+        when(idempotencyService.obtenerRecord("idempotency-key-test-completed-32-chars")).thenReturn(Optional.of(record));
+        when(carritoRepository.findByIdempotencyKey("idempotency-key-test-completed-32-chars")).thenReturn(Optional.of(carrito));
+
+        CheckoutDto dto = new CheckoutDto(1L, "idempotency-key-test-completed-32-chars", "token-test", null);
+        CarritoDeCompras resultado = carritoService.iniciarCheckout(CARRITO_ID, USUARIO_ID, dto);
+
+        assertNotNull(resultado);
+        assertEquals("idempotency-key-test-completed-32-chars", resultado.getIdempotencyKey());
+    }
+
+    @Test
+    void iniciarCheckout_DebeLanzarExcepcion_CuandoClaveDeIdempotenciaEstaPending() {
+        DetalleCarrito detalle = new DetalleCarrito();
+        detalle.setEventoId(EVENTO_ID);
+        detalle.setCantidad(2);
+        detalle.setIdCarritoDeCompras(CARRITO_ID);
+        carrito.getDetalles().add(detalle);
+
+        IdempotencyRecord record = new IdempotencyRecord();
+        record.setKey("idempotency-key-test-pending-32-chars");
+        record.setStatus(IdempotencyRecord.Status.PENDING);
+
+        when(carritoRepository.findById(CARRITO_ID)).thenReturn(Optional.of(carrito));
+        when(idempotencyService.obtenerRecord("idempotency-key-test-pending-32-chars")).thenReturn(Optional.of(record));
+
+        CheckoutDto dto = new CheckoutDto(1L, "idempotency-key-test-pending-32-chars", "token-test", null);
+
+        CarritoException exception = assertThrows(CarritoException.class,
+            () -> carritoService.iniciarCheckout(CARRITO_ID, USUARIO_ID, dto));
+        assertNotNull(exception);
+        assertEquals(CarritoException.CodigoError.IDEMPOTENCIA_INVALIDA, exception.getCodigo());
+        assertTrue(exception.getMessage().contains("Solicitud en proceso"));
+    }
+
+    @Test
+    void iniciarCheckout_DebeEliminarRecordYProceder_CuandoClaveDeIdempotenciaEstaFailed() {
+        DetalleCarrito detalle = new DetalleCarrito();
+        detalle.setEventoId(EVENTO_ID);
+        detalle.setCantidad(2);
+        detalle.setPrecioUnitario(new BigDecimal("10000"));
+        detalle.setIdCarritoDeCompras(CARRITO_ID);
+        carrito.getDetalles().add(detalle);
+        carrito.recalcularTotales();
+
+        IdempotencyRecord record = new IdempotencyRecord();
+        record.setKey("idempotency-key-test-failed-32-chars");
+        record.setStatus(IdempotencyRecord.Status.FAILED);
+
+        Reserva reservaGuardada = new Reserva();
+        reservaGuardada.setIdReserva(100L);
+
+        when(carritoRepository.findById(CARRITO_ID)).thenReturn(Optional.of(carrito));
+        when(idempotencyService.obtenerRecord("idempotency-key-test-failed-32-chars")).thenReturn(Optional.of(record));
+        doNothing().when(idempotencyService).eliminarRecord("idempotency-key-test-failed-32-chars");
+        doNothing().when(eventoClient).crearReserva(any(), any());
+        when(idempotencyService.registrarSolicitud(eq("idempotency-key-test-failed-32-chars"), any()))
+                .thenReturn(new IdempotencyRecord());
+        when(reservaRepository.save(any(Reserva.class))).thenReturn(reservaGuardada);
+        when(carritoRepository.save(any(CarritoDeCompras.class))).thenReturn(carrito);
+
+        CheckoutDto dto = new CheckoutDto(1L, "idempotency-key-test-failed-32-chars", "token-test", null);
+        CarritoDeCompras resultado = carritoService.iniciarCheckout(CARRITO_ID, USUARIO_ID, dto);
+
+        assertNotNull(resultado);
+        assertEquals(EstadoCarrito.RESERVADO, resultado.getEstadoCarrito());
+        assertEquals("idempotency-key-test-failed-32-chars", resultado.getIdempotencyKey());
+    }
+
+    @Test
     void renovarReserva_DebeExtenderExpiracion_CuandoEsPrimeraVez() {
         carrito.setEstadoCarrito(EstadoCarrito.RESERVADO);
         carrito.setFechaExpiracionReserva(LocalDateTime.now().plusMinutes(3));

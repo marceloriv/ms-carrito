@@ -77,6 +77,32 @@ public class IdempotencyService {
     }
 
     /**
+     * Obtiene el registro de idempotencia de forma segura.
+     *
+     * @param idempotencyKey clave a buscar.
+     * @return Optional con el registro si existe.
+     */
+    @Transactional(readOnly = true)
+    public java.util.Optional<IdempotencyRecord> obtenerRecord(String idempotencyKey) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            return java.util.Optional.empty();
+        }
+        return idempotencyRepository.findByKey(idempotencyKey);
+    }
+
+    /**
+     * Elimina un registro de idempotencia (por ejemplo, para permitir reintentos si falló).
+     *
+     * @param idempotencyKey clave a eliminar.
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void eliminarRecord(String idempotencyKey) {
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+            idempotencyRepository.deleteById(idempotencyKey);
+        }
+    }
+
+    /**
      * Obtiene el registro idempotente existente o lanza un error de negocio.
      *
      * @param idempotencyKey clave a buscar.

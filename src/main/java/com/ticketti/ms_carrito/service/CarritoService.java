@@ -34,6 +34,7 @@ import com.ticketti.ms_carrito.model.CarritoDeCompras;
 import com.ticketti.ms_carrito.model.DetalleCarrito;
 import com.ticketti.ms_carrito.model.EstadoCarrito;
 import com.ticketti.ms_carrito.model.EstadoPago;
+import com.ticketti.ms_carrito.model.IdempotencyRecord;
 import com.ticketti.ms_carrito.model.OutboxEvent;
 import com.ticketti.ms_carrito.model.Pago;
 import com.ticketti.ms_carrito.model.Reserva;
@@ -252,6 +253,22 @@ public class CarritoService {
 
         int totalEntradas = carrito.getTotalEntradas();
         String idempotencyKey = dto.getIdempotencyKey();
+
+        Optional<IdempotencyRecord> recordOpt = idempotencyService.obtenerRecord(idempotencyKey);
+        if (recordOpt.isPresent()) {
+            IdempotencyRecord record = recordOpt.get();
+            if (record.getStatus() == IdempotencyRecord.Status.COMPLETED) {
+                log.info("Clave de idempotencia {} ya completada. Devolviendo carrito cacheado.", idempotencyKey);
+                return carritoRepository.findByIdempotencyKey(idempotencyKey)
+                        .orElseThrow(() -> CarritoException.idempotenciaInvalida());
+            } else if (record.getStatus() == IdempotencyRecord.Status.PENDING) {
+                log.warn("Clave de idempotencia {} en proceso (concurrente).", idempotencyKey);
+                throw new CarritoException(CarritoException.CodigoError.IDEMPOTENCIA_INVALIDA, "Solicitud en proceso. Por favor espere.");
+            } else {
+                log.info("Clave de idempotencia {} fallida en intento previo. Limpiando para reintento.", idempotencyKey);
+                idempotencyService.eliminarRecord(idempotencyKey);
+            }
+        }
 
         idempotencyService.registrarSolicitud(idempotencyKey, dto.getRequestHash());
 
