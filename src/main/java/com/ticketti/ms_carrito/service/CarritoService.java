@@ -213,19 +213,8 @@ public class CarritoService {
         CarritoDeCompras carrito = carritoRepository.findById(carritoId)
                 .orElseThrow(() -> CarritoException.carritoNoEncontrado(carritoId));
 
-        validarPropiedadCarrito(carrito, usuarioId);
-
-        if (carrito.getEstadoCarrito() == EstadoCarrito.RESERVADO && carrito.getReservaId() != null) {
-            Reserva reserva = reservaRepository.findById(carrito.getReservaId()).orElse(null);
-            if (reserva != null) {
-                try {
-                    eventoClient.liberarReserva(reserva.getEventoId(), reserva.getCantidadEntradas());
-                    reserva.setEstadoReserva(Reserva.EstadoReserva.RESERVA_CANCELADA);
-                    reservaRepository.save(reserva);
-                } catch (Exception e) {
-                    log.warn("No se pudo liberar reserva: {}", e.getMessage());
-                }
-            }
+        if (carrito.getEstadoCarrito() == EstadoCarrito.RESERVADO) {
+            liberarReservasDelCarrito(carritoId);
         }
 
         detalleRepository.deleteByIdCarritoDeCompras(carritoId);
@@ -266,27 +255,36 @@ public class CarritoService {
 
         idempotencyService.registrarSolicitud(idempotencyKey, dto.getRequestHash());
 
-        ReservaRequestDto reservaRequest = new ReservaRequestDto();
-        reservaRequest.setCantidadEntradas(totalEntradas);
-        reservaRequest.setIdUsuario(usuarioId);
-
-        Long eventoId = null;
         List<DetalleCarrito> reservasExitosas = new ArrayList<>();
 
         for (DetalleCarrito detalle : carrito.getDetalles()) {
             try {
                 eventoClient.crearReserva(detalle.getEventoId(), detalle.getCantidad());
-                detalle.setIdReserva(0L);
+                
+                Reserva localReserva = new Reserva();
+                localReserva.setFechaReserva(LocalDateTime.now());
+                localReserva.setUsuarioIdUsu(usuarioId);
+                localReserva.setRolUsuarioIdUsuRol(carrito.getRolUsuarioId());
+                localReserva.setCarritoDeComprasIdCarrito(carritoId);
+                localReserva.setEventoId(detalle.getEventoId());
+                localReserva.setCantidadEntradas(detalle.getCantidad());
+                localReserva.setEstadoReserva(Reserva.EstadoReserva.RESERVA_INICIADA);
+                localReserva.setFechaExpiracion(LocalDateTime.now().plusMinutes(MINUTOS_RESERVA));
+                localReserva = reservaRepository.save(localReserva);
+
+                detalle.setIdReserva(localReserva.getIdReserva());
                 reservasExitosas.add(detalle);
-                eventoId = detalle.getEventoId();
             } catch (RuntimeException e) {
                 log.error("Error al crear reserva para evento {}: {}", detalle.getEventoId(), e.getMessage());
 
                 for (DetalleCarrito reservaExitosa : reservasExitosas) {
                     try {
                         eventoClient.liberarReserva(reservaExitosa.getEventoId(), reservaExitosa.getCantidad());
-                    } catch (RuntimeException ex) {
-                        log.error("Error liberando reserva del evento {}: {}", reservaExitosa.getEventoId(), ex.getMessage());
+                        if (reservaExitosa.getIdReserva() != null) {
+                            reservaRepository.deleteById(reservaExitosa.getIdReserva());
+                        }
+                    } catch (Exception ex) {
+                        log.error("Error liberando/eliminando reserva del evento {}: {}", reservaExitosa.getEventoId(), ex.getMessage());
                     }
                 }
 
@@ -299,20 +297,11 @@ public class CarritoService {
             }
         }
 
-        Reserva reserva = new Reserva();
-        reserva.setFechaReserva(LocalDateTime.now());
-        reserva.setUsuarioIdUsu(usuarioId);
-        reserva.setRolUsuarioIdUsuRol(carrito.getRolUsuarioId());
-        reserva.setCarritoDeComprasIdCarrito(carritoId);
-        reserva.setEventoId(eventoId);
-        reserva.setCantidadEntradas(totalEntradas);
-        reserva.setEstadoReserva(Reserva.EstadoReserva.RESERVA_INICIADA);
-        reserva.setFechaExpiracion(LocalDateTime.now().plusMinutes(MINUTOS_RESERVA));
-        reserva = reservaRepository.save(reserva);
-
         carrito.setCausaSocialId(dto.getCausaSocialId());
         carrito.recalcularTotales();
-        carrito.setReservaId(reserva.getIdReserva());
+        if (!reservasExitosas.isEmpty()) {
+            carrito.setReservaId(reservasExitosas.get(0).getIdReserva());
+        }
         carrito.setIdempotencyKey(idempotencyKey);
         carrito.setEstadoCarrito(EstadoCarrito.RESERVADO);
         carrito.setFechaExpiracionReserva(LocalDateTime.now().plusMinutes(MINUTOS_RESERVA));
@@ -390,19 +379,7 @@ public class CarritoService {
         }
 
         if (!"aprobado".equalsIgnoreCase(dto.getEstado())) {
-            if (carrito.getReservaId() != null) {
-                Reserva reserva = reservaRepository.findById(carrito.getReservaId()).orElse(null);
-                if (reserva != null) {
-                    try {
-                        eventoClient.liberarReserva(reserva.getEventoId(), reserva.getCantidadEntradas());
-                        reserva.setEstadoReserva(Reserva.EstadoReserva.RESERVA_CANCELADA);
-                        reservaRepository.save(reserva);
-                    } catch (Exception e) {
-                        log.error("Error liberando reserva: {}", e.getMessage());
-                    }
-                }
-            }
-
+            liberarReservasDelCarrito(carritoId);
             return pagoWebhookService.procesarPagoRechazado(carrito);
         }
 
@@ -465,18 +442,7 @@ public class CarritoService {
 
         BigDecimal montoReembolso = carrito.getSubtotal().multiply(PORCENTAJE_REEMBOLSO);
 
-        if (carrito.getReservaId() != null) {
-            Reserva reserva = reservaRepository.findById(carrito.getReservaId()).orElse(null);
-            if (reserva != null) {
-                try {
-                    eventoClient.liberarReserva(reserva.getEventoId(), reserva.getCantidadEntradas());
-                    reserva.setEstadoReserva(Reserva.EstadoReserva.RESERVA_CANCELADA);
-                    reservaRepository.save(reserva);
-                } catch (Exception e) {
-                    log.error("Error liberando reserva en devolucion: {}", e.getMessage());
-                }
-            }
-        }
+        liberarReservasDelCarrito(carritoId);
 
         carrito.setEstadoCarrito(EstadoCarrito.REEMBOLSADO);
         carrito.setEstadoPago(EstadoPago.REEMBOLSADO);
@@ -671,6 +637,25 @@ public class CarritoService {
         }
 
         return evt;
+    }
+    private void liberarReservasDelCarrito(Long carritoId) {
+        List<Reserva> reservas = reservaRepository.findByCarritoDeComprasIdCarrito(carritoId);
+        for (Reserva reserva : reservas) {
+            if (reserva.getEstadoReserva() == Reserva.EstadoReserva.RESERVA_INICIADA ||
+                reserva.getEstadoReserva() == Reserva.EstadoReserva.RESERVA_CONFIRMADA ||
+                reserva.getEstadoReserva() == Reserva.EstadoReserva.RESERVA_PENDIENTE) {
+                try {
+                    eventoClient.liberarReserva(reserva.getEventoId(), reserva.getCantidadEntradas());
+                    reserva.setEstadoReserva(Reserva.EstadoReserva.RESERVA_CANCELADA);
+                    reservaRepository.save(reserva);
+                    log.info("Liberada reserva {} para evento {} y cantidad {}", 
+                             reserva.getIdReserva(), reserva.getEventoId(), reserva.getCantidadEntradas());
+                } catch (Exception e) {
+                    log.error("Error liberando reserva {} del evento {}: {}", 
+                              reserva.getIdReserva(), reserva.getEventoId(), e.getMessage());
+                }
+            }
+        }
     }
 
     public List<EstadisticaEventoDto> obtenerEstadisticasPorEventos(List<Long> eventoIds) {

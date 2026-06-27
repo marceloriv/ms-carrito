@@ -1,5 +1,6 @@
 package com.ticketti.ms_carrito.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -15,4 +16,6 @@ public interface ReservaRepository extends JpaRepository<Reserva, Long> {
     List<Reserva> findByUsuarioIdUsu(Long usuarioId);
 
     Optional<Reserva> findByEventoIdAndUsuarioIdUsu(Long eventoId, Long usuarioId);
+
+    List<Reserva> findByEstadoReservaInAndFechaExpiracionBefore(List<Reserva.EstadoReserva> estados, LocalDateTime fecha);
 }

@@ -248,9 +248,11 @@ class CarritoServiceTest {
         Reserva reserva = new Reserva();
         reserva.setIdReserva(100L);
         reserva.setEventoId(EVENTO_ID);
+        reserva.setCantidadEntradas(2);
+        reserva.setEstadoReserva(Reserva.EstadoReserva.RESERVA_CONFIRMADA);
 
         when(carritoRepository.findById(CARRITO_ID)).thenReturn(Optional.of(carrito));
-        when(reservaRepository.findById(100L)).thenReturn(Optional.of(reserva));
+        when(reservaRepository.findByCarritoDeComprasIdCarrito(CARRITO_ID)).thenReturn(java.util.List.of(reserva));
         doNothing().when(eventoClient).liberarReserva(any(), any());
         when(carritoRepository.save(any(CarritoDeCompras.class))).thenReturn(carrito);
         when(outboxRepository.save(any())).thenReturn(new OutboxEvent());
@@ -288,9 +290,11 @@ class CarritoServiceTest {
         Reserva reserva = new Reserva();
         reserva.setIdReserva(100L);
         reserva.setEventoId(EVENTO_ID);
+        reserva.setCantidadEntradas(1);
+        reserva.setEstadoReserva(Reserva.EstadoReserva.RESERVA_INICIADA);
 
         when(carritoRepository.findById(CARRITO_ID)).thenReturn(Optional.of(carrito));
-        when(reservaRepository.findById(100L)).thenReturn(Optional.of(reserva));
+        when(reservaRepository.findByCarritoDeComprasIdCarrito(CARRITO_ID)).thenReturn(java.util.List.of(reserva));
         doNothing().when(detalleRepository).deleteByIdCarritoDeCompras(CARRITO_ID);
         doNothing().when(eventoClient).liberarReserva(any(), any());
         when(carritoRepository.save(any(CarritoDeCompras.class))).thenReturn(carrito);

@@ -254,14 +254,8 @@ public class SagaOrchestrator {
 		pedido.getItems().forEach(item -> {
 			try {
 				eventoClient.crearReserva(item.getEventoId(), item.getCantidad());
-				Long idReserva = 0L;
-				item.setReservaId(idReserva);
-				if (pedido.getReservaId() == null) {
-					pedido.setReservaId(idReserva);
-				}
 
 				Reserva localReserva = new Reserva();
-				localReserva.setIdReserva(idReserva);
 				localReserva.setFechaReserva(LocalDateTime.now());
 				localReserva.setUsuarioIdUsu(carrito.getUsuarioId());
 				localReserva.setRolUsuarioIdUsuRol(carrito.getRolUsuarioId());
@@ -270,7 +264,12 @@ public class SagaOrchestrator {
 				localReserva.setCantidadEntradas(item.getCantidad());
 				localReserva.setEstadoReserva(Reserva.EstadoReserva.RESERVA_CONFIRMADA);
 				localReserva.setFechaExpiracion(LocalDateTime.now().plusMinutes(MINUTOS_RESERVA));
-				reservaRepository.save(localReserva);
+				localReserva = reservaRepository.save(localReserva);
+
+				item.setReservaId(localReserva.getIdReserva());
+				if (pedido.getReservaId() == null || pedido.getReservaId() == 0L) {
+					pedido.setReservaId(localReserva.getIdReserva());
+				}
 			} catch (RuntimeException ex) {
 				log.error("Error reservando stock para evento {}: {}", item.getEventoId(), ex.getMessage());
 				throw CarritoException.stockNoDisponible(item.getEventoId());
@@ -278,13 +277,6 @@ public class SagaOrchestrator {
 		});
 	}
 
-	/**
-	 * Registra el pago aprobado en la base de datos.
-	 *
-	 * @param pedido pedido asociado al pago.
-	 * @param dto datos del checkout.
-	 * @return id del pago registrado.
-	 */
 	private Long procesarPago(Pedido pedido, CheckoutDto dto) {
 		log.info("[SAGA] Procesando pago para pedido: {}", pedido.getId());
 
