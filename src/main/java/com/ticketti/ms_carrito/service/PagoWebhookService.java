@@ -7,6 +7,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ticketti.ms_carrito.client.CausaSocialClient;
+import com.ticketti.ms_carrito.client.EventoClient;
+import com.ticketti.ms_carrito.client.UsuarioClient;
 import com.ticketti.ms_carrito.dto.WebhookPagoDto;
 import com.ticketti.ms_carrito.exception.CarritoException;
 import com.ticketti.ms_carrito.messaging.CompraConfirmadaEvent;
@@ -33,6 +36,9 @@ public class PagoWebhookService {
     private final IdempotencyService idempotencyService;
     private final ObjectMapper objectMapper;
     private final CarritoService carritoService;
+    private final UsuarioClient usuarioClient;
+    private final EventoClient eventoClient;
+    private final CausaSocialClient causaSocialClient;
 
     /**
      * Procesa un pago aprobado y deja persistidos el carrito, el pago y el outbox.
@@ -56,7 +62,8 @@ public class PagoWebhookService {
         pago.setIdempotencyKey(carrito.getIdempotencyKey());
         pago.setTokenPasarela(dto.getToken());
         pago.setEstadoPago(EstadoPago.PAGADO);
-        pagoRepository.save(pago);
+        pago = pagoRepository.save(pago);
+        carrito.setIdPago(pago.getIdPago());
 
         guardarEventoOutbox(carrito, "pago.aprobado");
 
@@ -115,8 +122,49 @@ public class PagoWebhookService {
             evt.setCausaSocialId(carrito.getCausaSocialId());
             evt.setTotal(carrito.getTotal());
             evt.setMontoDonacion(carrito.getMontoDonacion());
+
+            Long eventoId = null;
             if (carrito.getDetalles() != null && !carrito.getDetalles().isEmpty()) {
-                evt.setEventoId(carrito.getDetalles().get(0).getEventoId().longValue());
+                eventoId = carrito.getDetalles().get(0).getEventoId().longValue();
+                evt.setEventoId(eventoId);
+            }
+
+            try {
+                if (carrito.getUsuarioId() != null) {
+                    var usuario = usuarioClient.buscarUsuario(carrito.getUsuarioId());
+                    if (usuario != null) {
+                        evt.setCorreoUsuario(usuario.getCorreo());
+                        evt.setNombreUsuario(usuario.getNombre());
+                    }
+                }
+            } catch (Exception ex) {
+                log.warn("No se pudo obtener usuario para outbox: {}", ex.getMessage());
+            }
+
+            try {
+                if (eventoId != null) {
+                    var evento = eventoClient.buscarEvento(eventoId.intValue());
+                    if (evento != null) {
+                        evt.setNombreEvento(evento.getNombre());
+                        evt.setFechaEvento(evento.getFecha() != null ? evento.getFecha().toString() : null);
+                        if (evento.getRecinto() != null) {
+                            evt.setLugarEvento(evento.getRecinto().getNombre());
+                        }
+                    }
+                }
+            } catch (Exception ex) {
+                log.warn("No se pudo obtener evento para outbox: {}", ex.getMessage());
+            }
+
+            try {
+                if (carrito.getCausaSocialId() != null) {
+                    var causa = causaSocialClient.buscarCausa(carrito.getCausaSocialId());
+                    if (causa != null) {
+                        evt.setNombreCausa(causa.getNombre());
+                    }
+                }
+            } catch (Exception ex) {
+                log.warn("No se pudo obtener causa social para outbox: {}", ex.getMessage());
             }
 
             String payload = objectMapper.writeValueAsString(evt);
