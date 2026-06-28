@@ -56,7 +56,8 @@ public class PagoWebhookService {
         pago.setIdempotencyKey(carrito.getIdempotencyKey());
         pago.setTokenPasarela(dto.getToken());
         pago.setEstadoPago(EstadoPago.PAGADO);
-        pagoRepository.save(pago);
+        pago = pagoRepository.save(pago);
+        carrito.setIdPago(pago.getIdPago());
 
         guardarEventoOutbox(carrito, "pago.aprobado");
 
