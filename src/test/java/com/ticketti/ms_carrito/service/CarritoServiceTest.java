@@ -29,7 +29,9 @@ import com.ticketti.ms_carrito.client.EventoClient;
 import com.ticketti.ms_carrito.dto.AgregarEntradaDto;
 import com.ticketti.ms_carrito.dto.CheckoutDto;
 import com.ticketti.ms_carrito.dto.DevolucionRequestDto;
+import com.ticketti.ms_carrito.dto.DevolucionRequestDto;
 import com.ticketti.ms_carrito.dto.DevolucionResponseDto;
+import com.ticketti.ms_carrito.dto.ResumenCarritoDto;
 import com.ticketti.ms_carrito.exception.CarritoException;
 import com.ticketti.ms_carrito.model.CarritoDeCompras;
 import com.ticketti.ms_carrito.model.DetalleCarrito;
@@ -65,6 +67,9 @@ class CarritoServiceTest {
 
     @Mock
     private IdempotencyService idempotencyService;
+
+    @Mock
+    private NonceService nonceService;
 
     @Mock
     private OutboxEventRepository outboxRepository;
@@ -386,5 +391,69 @@ class CarritoServiceTest {
 
         assertEquals(EstadoCarrito.CANCELADO, resultado.getEstadoCarrito());
         assertTrue(resultado.getDetalles().isEmpty());
+    }
+
+    @Test
+    void obtenerVenta_DebeRetornarResumen_CuandoEstadoEsPagado() {
+        carrito.setEstadoCarrito(EstadoCarrito.PAGADO);
+        carrito.setEstadoPago(EstadoPago.PAGADO);
+
+        DetalleCarrito detalle = new DetalleCarrito();
+        detalle.setEventoId(EVENTO_ID);
+        detalle.setTipoEntradaNombre("General");
+        detalle.setCantidad(2);
+        detalle.setPrecioUnitario(new BigDecimal("10000"));
+        detalle.setIdCarritoDeCompras(CARRITO_ID);
+        carrito.getDetalles().add(detalle);
+        carrito.recalcularTotales();
+
+        when(carritoRepository.findById(CARRITO_ID)).thenReturn(Optional.of(carrito));
+
+        ResumenCarritoDto resultado = carritoService.obtenerVenta(CARRITO_ID);
+
+        assertNotNull(resultado);
+        assertEquals(CARRITO_ID, resultado.getCarritoId());
+        assertEquals("PAGADO", resultado.getEstadoCarrito());
+        assertEquals("PAGADO", resultado.getEstadoPago());
+        assertEquals(1, resultado.getItems().size());
+        assertEquals("General", resultado.getItems().get(0).getTipoEntrada());
+        assertEquals(2, resultado.getTotalEntradas());
+    }
+
+    @Test
+    void obtenerVenta_DebeRetornarResumen_CuandoEstadoEsReembolsado() {
+        carrito.setEstadoCarrito(EstadoCarrito.REEMBOLSADO);
+        carrito.setEstadoPago(EstadoPago.REEMBOLSADO);
+
+        when(carritoRepository.findById(CARRITO_ID)).thenReturn(Optional.of(carrito));
+
+        ResumenCarritoDto resultado = carritoService.obtenerVenta(CARRITO_ID);
+
+        assertNotNull(resultado);
+        assertEquals(CARRITO_ID, resultado.getCarritoId());
+        assertEquals("REEMBOLSADO", resultado.getEstadoCarrito());
+    }
+
+    @Test
+    void obtenerVenta_DebeLanzarExcepcion_CuandoNoExiste() {
+        when(carritoRepository.findById(999L)).thenReturn(Optional.empty());
+
+        CarritoException exception = assertThrows(CarritoException.class,
+            () -> carritoService.obtenerVenta(999L));
+        assertNotNull(exception);
+        assertEquals(CarritoException.CodigoError.CARRO_NO_ENCONTRADO, exception.getCodigo());
+    }
+
+    @Test
+    void obtenerVenta_DebeLanzarExcepcion_CuandoEstadoEsCreado() {
+        carrito.setEstadoCarrito(EstadoCarrito.CREADO);
+
+        when(carritoRepository.findById(CARRITO_ID)).thenReturn(Optional.of(carrito));
+
+        CarritoException exception = assertThrows(CarritoException.class,
+            () -> carritoService.obtenerVenta(CARRITO_ID));
+        assertNotNull(exception);
+        assertEquals(CarritoException.CodigoError.CARRO_NO_ENCONTRADO, exception.getCodigo());
+        assertTrue(exception.getMessage().contains("no se encuentra en estado válido"));
     }
 }

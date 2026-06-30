@@ -27,7 +27,7 @@ public class RabbitMQConfig {
      */
     @Bean
     public DirectExchange exchangePrincipal() {
-        return new DirectExchange(EXCHANGE);
+        return new DirectExchange(EXCHANGE, true, false);
     }
 
     /**

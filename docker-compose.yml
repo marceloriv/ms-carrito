@@ -32,8 +32,6 @@ services:
       timeout: 10s
       retries: 5
       start_period: 60s
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     networks:
       - ticketti-network
     environment:
@@ -46,7 +44,7 @@ services:
       SPRING_RABBITMQ_USERNAME: ${SPRING_RABBITMQ_USERNAME}
       SPRING_RABBITMQ_PASSWORD: ${SPRING_RABBITMQ_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
-      SPRING_CONFIG_IMPORT: optional:configserver:http://host.docker.internal:8888
+      SPRING_CONFIG_IMPORT: optional:configserver:http://config-server:8888
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://discovery-server:8761/eureka/
 
 volumes:

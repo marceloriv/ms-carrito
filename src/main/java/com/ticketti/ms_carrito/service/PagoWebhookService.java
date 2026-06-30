@@ -167,6 +167,8 @@ public class PagoWebhookService {
                 log.warn("No se pudo obtener causa social para outbox: {}", ex.getMessage());
             }
 
+            evt.setCodigoQr("TICKETTI-" + carrito.getIdCarrito() + "-" + eventoId);
+
             String payload = objectMapper.writeValueAsString(evt);
 
             OutboxEvent event = new OutboxEvent();
