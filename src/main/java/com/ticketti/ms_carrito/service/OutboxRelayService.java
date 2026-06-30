@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.ticketti.ms_carrito.config.RabbitMQConfig;
 import com.ticketti.ms_carrito.messaging.CompraConfirmadaEvent;
 import com.ticketti.ms_carrito.model.OutboxEvent;
 import com.ticketti.ms_carrito.repository.OutboxEventRepository;
@@ -20,7 +21,6 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class OutboxRelayService {
 
-    private static final String EXCHANGE_NAME = "ticketti.exchange";
     private static final int BATCH_SIZE = 50;
     private static final int MAX_RETRIES = 5;
     private static final int BASE_BACKOFF_SECONDS = 5;
@@ -72,11 +72,11 @@ public class OutboxRelayService {
                 String routingKey = event.getRoutingKey() != null ? event.getRoutingKey() : event.getType();
                 try {
                     CompraConfirmadaEvent payload = objectMapper.readValue(event.getPayload(), CompraConfirmadaEvent.class);
-                    rabbitTemplate.convertAndSend(EXCHANGE_NAME, routingKey, payload);
+                    rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE, routingKey, payload);
                 } catch (Exception deserEx) {
                     // Fallback: enviar el payload original (JSON string) para compatibilidad
                     log.warn("No se pudo deserializar payload a CompraConfirmadaEvent (id {}): {}. Enviando payload bruto.", event.getId(), deserEx.getMessage());
-                    rabbitTemplate.convertAndSend(EXCHANGE_NAME, routingKey, event.getPayload());
+                    rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE, routingKey, event.getPayload());
                 }
 
                 event.setStatus(OutboxEvent.Status.SENT);

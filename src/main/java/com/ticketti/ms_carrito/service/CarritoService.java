@@ -67,6 +67,7 @@ public class CarritoService {
     private final OutboxEventRepository outboxRepository;
     private final EventoClient eventoClient;
     private final IdempotencyService idempotencyService;
+    private final NonceService nonceService;
     private final PagoWebhookService pagoWebhookService;
     private final UsuarioClient usuarioClient;
     private final CausaSocialClient causaSocialClient;
@@ -79,6 +80,7 @@ public class CarritoService {
                          OutboxEventRepository outboxRepository,
                          EventoClient eventoClient,
                          IdempotencyService idempotencyService,
+                         NonceService nonceService,
                          @Lazy PagoWebhookService pagoWebhookService,
                          UsuarioClient usuarioClient,
                          CausaSocialClient causaSocialClient,
@@ -90,6 +92,7 @@ public class CarritoService {
         this.outboxRepository = outboxRepository;
         this.eventoClient = eventoClient;
         this.idempotencyService = idempotencyService;
+        this.nonceService = nonceService;
         this.pagoWebhookService = pagoWebhookService;
         this.usuarioClient = usuarioClient;
         this.causaSocialClient = causaSocialClient;
@@ -531,6 +534,27 @@ public class CarritoService {
     }
 
     /**
+     * Obtiene una venta (carrito pagado o reembolsado) por su ID.
+     * No requiere validación de propiedad — diseñado para acceso administrativo / consulta de venta.
+     *
+     * @param ventaId ID del carrito (venta).
+     * @return ResumenCarritoDto con los datos de la venta.
+     */
+    @Transactional(readOnly = true)
+    public ResumenCarritoDto obtenerVenta(Long ventaId) {
+        CarritoDeCompras carrito = carritoRepository.findById(ventaId)
+                .orElseThrow(() -> CarritoException.carritoNoEncontrado(ventaId));
+
+        if (carrito.getEstadoCarrito() != EstadoCarrito.PAGADO &&
+            carrito.getEstadoCarrito() != EstadoCarrito.REEMBOLSADO) {
+            throw new CarritoException(CarritoException.CodigoError.CARRO_NO_ENCONTRADO,
+                "La venta " + ventaId + " no se encuentra en estado válido (PAGADO o REEMBOLSADO)");
+        }
+
+        return ResumenCarritoDto.fromCarrito(carrito);
+    }
+
+    /**
      * Verifica que el carrito pertenezca al usuario indicado.
      * Para carritos invitados (usuarioId == null), permite acceso sin validación.
      * Para carritos de usuarios autenticados, exige coincidencia con X-Usuario-Id.
@@ -567,6 +591,8 @@ public class CarritoService {
             timestamp.isAfter(LocalDateTime.now().plusMinutes(WEBHOOK_TOLERANCE_MINUTES))) {
             throw CarritoException.webhookInvalido("timestamp fuera de rango");
         }
+
+        nonceService.validarNonce(dto.getNonce(), dto.getPedidoId());
     }
 
     /**
@@ -652,6 +678,8 @@ public class CarritoService {
         } catch (Exception ex) {
             log.warn("No se pudo obtener causa social para enriquecimiento: {}", ex.getMessage());
         }
+
+        evt.setCodigoQr("TICKETTI-" + carrito.getIdCarrito() + "-" + evt.getEventoId());
 
         return evt;
     }

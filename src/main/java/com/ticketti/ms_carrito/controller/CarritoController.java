@@ -116,6 +116,20 @@ public class CarritoController {
         return ResponseEntity.ok(ApiRespuestaDto.exito("Resumen obtenido", resumen));
     }
 
+    @Operation(summary = "Obtener venta por ID", description = "Obtiene una venta (carrito pagado o reembolsado) por su ID")
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Venta obtenida exitosamente",
+                content = @Content(schema = @Schema(implementation = ResumenCarritoDto.class))),
+        @ApiResponse(responseCode = "404", description = "Venta no encontrada o en estado invalido")
+    })
+    @GetMapping("/ventas/{id}")
+    public ResponseEntity<ApiRespuestaDto<ResumenCarritoDto>> obtenerVenta(
+            @Parameter(description = "ID de la venta", required = true) @PathVariable Long id) {
+        log.info("GET /api/v1/Carrito/ventas/{}", id);
+        ResumenCarritoDto resumen = carritoService.obtenerVenta(id);
+        return ResponseEntity.ok(ApiRespuestaDto.exito("Venta obtenida", resumen));
+    }
+
     @Operation(summary = "Agregar entrada al carrito", description = "Agrega una entrada al carrito existente")
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Entrada agregada exitosamente"),
