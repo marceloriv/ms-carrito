@@ -22,7 +22,7 @@ public class Resilience4jConfig {
                         .slidingWindowSize(10)
                         .build())
                 .timeLimiterConfig(TimeLimiterConfig.custom()
-                        .timeoutDuration(Duration.ofSeconds(5))
+                        .timeoutDuration(Duration.ofSeconds(10))
                         .build())
                 .build());
     }
